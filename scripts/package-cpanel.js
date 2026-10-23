@@ -69,9 +69,10 @@ for (const pkg of packagesToCopy) {
   }
 }
 
-// Ensure logs and data directories exist
+// Ensure logs, data, and tmp directories exist
 fs.mkdirSync(path.join(stagingDir, 'logs'), { recursive: true });
 fs.mkdirSync(path.join(stagingDir, 'data'), { recursive: true });
+fs.mkdirSync(path.join(stagingDir, 'tmp'), { recursive: true });
 
 console.log('[3/4] Creating ZIP archive compatible with Linux/cPanel...');
 try {
