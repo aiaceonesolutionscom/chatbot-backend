@@ -1,0 +1,9 @@
+[2026-10-23 12:21:23] [INFO] [Universal Chatbot Backend] Server running at http://0.0.0.0:3000
+[2026-10-23 12:21:23] [INFO] [Tenant Registered] Colbolt (colbolt_live), Tiles Master (tiles_master)
+[2026-10-23 12:27:50] [INFO] [Chat] [colbolt_live] processed in 20335ms | {"message":"hello","cardsCount":0}
+[2026-10-23 12:28:31] [INFO] [Chat] [colbolt_live] processed in 18966ms | {"message":"mujhays ema dikhao 20 dollar ka budget hai meraa","cardsCount":1}
+[2026-10-23 12:29:54] [INFO] [Universal Chatbot Backend] Server running at http://0.0.0.0:3000
+[2026-10-23 12:29:54] [INFO] [Tenant Registered] Colbolt (colbolt_live), Tiles Master (tiles_master)
+[2026-10-23 12:30:33] [INFO] [Chat] [colbolt_live] processed in 25459ms | {"message":"Semaglutide 5mg ka order karna hai","cardsCount":2}
+[2026-10-23 12:42:36] [INFO] [Universal Chatbot Backend] Server running at http://0.0.0.0:3000
+[2026-10-23 12:42:36] [INFO] [Tenant Registered] Colbolt (colbolt_live), Tiles Master (tiles_master)

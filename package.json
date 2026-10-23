@@ -1,0 +1,26 @@
+{
+  "name": "universal-commerce-chatbot",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Universal AI Commerce Chatbot Platform with multi-tenant isolation, Shadow DOM widget, WooCommerce/Odoo/Shopify adapters, and WordPress plugin.",
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "start:backend": "npm --workspace=packages/backend run start",
+    "dev:backend": "npm --workspace=packages/backend run dev",
+    "build:widget": "npm --workspace=packages/widget run build",
+    "build:plugin": "node scripts/package-plugin.js"
+  },
+  "workspaces": [
+    "packages/shared",
+    "packages/backend",
+    "packages/widget"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "ret": "^0.5.1"
+  }
+}

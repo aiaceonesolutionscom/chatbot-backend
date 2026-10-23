@@ -1,0 +1,15 @@
+{
+  "name": "@universal-chatbot/widget",
+  "version": "1.0.0",
+  "description": "Standalone Shadow DOM embeddable chat widget for Universal AI Commerce Chatbot",
+  "main": "dist/widget.js",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "vite": "^5.2.11"
+  }
+}

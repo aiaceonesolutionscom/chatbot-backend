@@ -1,0 +1,89 @@
+{
+  "tenantId": "colbolt-store-01",
+  "siteKey": "colbolt_live",
+  "secretApiKey": "sec_colbolt_demo_key_2026",
+  "allowedOrigins": [
+    "https://colbolt.hawksnfox.com",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:8080",
+    "http://127.0.0.1:5500",
+    "*"
+  ],
+  "brand": {
+    "companyName": "Colbolt",
+    "assistantName": "COLBOLT.",
+    "logoUrl": "https://colbolt.hawksnfox.com/wp-content/plugins/universal-commerce-ai-chatbot/assets/assistance.gif",
+    "primaryColor": "#16408a",
+    "secondaryColor": "#248acc",
+    "fontFamily": "'Jost', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    "launcherPosition": "bottom-right",
+    "welcomeMessage": "Hello! Welcome to Colbolt. I can help you find products (like Bacteriostatic Water, Tirz, Retatrutide), check prices within your budget, or add items directly to your cart. How can I help you today?",
+    "suggestedQuestions": [
+      "What does Colbolt do?",
+      "Show me Tirz products",
+      "What is Bacteriostatic Water?",
+      "What are your shipping policies?"
+    ],
+    "whatsAppNumber": "",
+    "badgeText": "Online"
+  },
+  "company": {
+    "businessName": "Colbolt",
+    "tagline": "Premium Research Solutions & Compounds",
+    "aboutUs": "Colbolt provides premium quality research solutions, laboratory compounds, and peptides with rigorous quality control, verified purity, and discreet fast delivery. Scientific aur research purposes ke liye verified products provide karte hain.",
+    "industry": "Research Solutions & Laboratory Compounds",
+    "services": [
+      "Certified Research Compound Distribution",
+      "Batch Quality and Purity Testing",
+      "Discreet & Fast Order Fulfillment",
+      "Dedicated Customer Inquiries & Order Assistance"
+    ],
+    "shippingPolicy": "Orders are processed securely and dispatched within 24-48 business hours with tracking provided.",
+    "deliveryEstimate": "Standard US shipping takes 3-5 business days; expedited options available at checkout.",
+    "paymentMethods": ["Direct Bank Transfer (BACS)", "Cash on Delivery (COD) where available"],
+    "returnPolicy": "Due to the nature of research products, returns are handled individually if items arrive damaged or incorrect.",
+    "supportEmail": "info@colbolt.com",
+    "businessHours": "Monday - Friday: 9:00 AM - 6:00 PM (PST)",
+    "faqs": [
+      {
+        "question": "What does Colbolt do? / Aap kya kaam karte hain?",
+        "answer": "Colbolt is an online store offering laboratory research compounds, peptides, and solutions such as Tirz (10mg/30mg), Retatrutide, and Bacteriostatic Water with verified quality."
+      },
+      {
+        "question": "How do I buy or add items to cart?",
+        "answer": "You can simply ask me about any product or click the 'Add to Cart' button on the product cards in our chat. The item is directly added to your website cart!"
+      },
+      {
+        "question": "Where can I see my cart and checkout?",
+        "answer": "Once you add an item, you can click 'View Cart' or proceed directly to checkout at https://colbolt.hawksnfox.com/checkout/."
+      },
+      {
+        "question": "Do you ship discreetly?",
+        "answer": "Yes, all packages are shipped discreetly and securely."
+      }
+    ]
+  },
+  "commerce": {
+    "type": "woocommerce",
+    "woocommerce": {
+      "storeUrl": "https://colbolt.hawksnfox.com",
+      "useStoreApi": true
+    }
+  },
+  "ai": {
+    "provider": "openrouter",
+    "model": "openrouter/free",
+    "temperature": 0.25,
+    "maxTokens": 3000,
+    "supportedLanguages": ["en", "ur", "roman_ur", "hi"],
+    "systemPromptOverride": "STRICT DOMAIN BOUNDARY & SECURITY:\n1. You are strictly a sales and customer service assistant for Colbolt. You must NEVER discuss politics, general news, programming/coding, homework, entertainment, recipes, or unrelated topics.\n2. If a customer asks anything outside Colbolt's domain, you must politely decline: 'Maaf kijiye ga, mujhay is baray mein baat karnay ki ijazat nahi hai. Main sirf Colbolt ke research compounds, peptides, orders aur shipping ke hawale se aapki madad kar sakta hoon.'\n3. RESEARCH CONTEXT: All Colbolt products are supplied strictly for qualified in-vitro and laboratory research purposes. Never provide personal medical prescriptions or dosing advice.\n4. INTELLIGENT CROSS-SELLING: When a customer inquires about or buys peptides (Tirzepatide / Tirz, Retatrutide, Semaglutide), remind them that Bacteriostatic Water 10mg ($15.00) is available as the sterile diluent for reconstitution."
+  },
+  "activeTools": [
+    "search_products",
+    "get_product_details",
+    "compare_products",
+    "add_to_cart",
+    "get_company_info"
+  ]
+}

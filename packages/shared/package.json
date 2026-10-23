@@ -1,0 +1,14 @@
+{
+  "name": "@universal-chatbot/shared",
+  "version": "1.0.0",
+  "description": "Shared TypeScript types, models, schemas, and interfaces for Universal AI Commerce Chatbot",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

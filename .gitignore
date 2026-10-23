@@ -1,0 +1,7 @@
+node_modules/
+dist-plugin/*.zip
+dist-cpanel/*.zip
+.env.local
+logs/*.bak
+.DS_Store
+Thumbs.db

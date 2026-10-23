@@ -1,0 +1,102 @@
+{
+  "tenantId": "tiles-master-01",
+  "siteKey": "tiles_master",
+  "secretApiKey": "sec_tiles_demo_key_2026",
+  "allowedOrigins": [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:8080",
+    "http://127.0.0.1:5500",
+    "*"
+  ],
+  "brand": {
+    "companyName": "Tiles Master",
+    "assistantName": "TILES MASTER.",
+    "logoUrl": "",
+    "primaryColor": "#b45309",
+    "secondaryColor": "#d97706",
+    "fontFamily": "'Jost', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    "launcherPosition": "bottom-right",
+    "welcomeMessage": "Hello! Welcome to Tiles Master. I can help you calculate the exact number of tile boxes for your room, recommend floor & wall tiles, or check prices. How can I help you today?",
+    "suggestedQuestions": [
+      "Calculate tiles for my room",
+      "Show porcelain floor tiles",
+      "What are your delivery times?",
+      "How much wastage should I add?"
+    ],
+    "whatsAppNumber": "",
+    "badgeText": "Online"
+  },
+  "company": {
+    "businessName": "Tiles Master",
+    "tagline": "Premium Ceramic, Porcelain & Marble Tiles",
+    "aboutUs": "Tiles Master specializes in premium imported porcelain floor tiles, wall ceramic tiles, bathroom mosaics, and outdoor paving slabs with custom square footage estimation.",
+    "industry": "Ceramic, Porcelain & Construction Flooring",
+    "services": [
+      "Residential & Commercial Tile Supply",
+      "Room Area & Box Quantity Estimation",
+      "Sample Box Delivery",
+      "Tile Adhesives & Grout Supply"
+    ],
+    "shippingPolicy": "Pallet delivery within 3-5 business days directly to your doorstep with hydraulic liftgate unloading.",
+    "deliveryEstimate": "3-5 business days for standard delivery; express next-day delivery available for pallet orders.",
+    "paymentMethods": ["Credit Card", "Bank Transfer", "Pay on Delivery"],
+    "returnPolicy": "Unopened full boxes can be returned within 30 days.",
+    "supportEmail": "sales@tilesmaster.example.com",
+    "businessHours": "Monday - Saturday: 8:00 AM - 7:00 PM",
+    "faqs": [
+      {
+        "question": "How do I calculate how many tiles I need?",
+        "answer": "Multiply room length by width to get total sq ft, add 10% for cuts and wastage, then divide by the square footage covered by each box (e.g. 16 sq ft per box)."
+      },
+      {
+        "question": "What is the difference between ceramic and porcelain tiles?",
+        "answer": "Porcelain is denser, less porous, and much more durable than ceramic, making it ideal for high-traffic floors and moisture-prone areas like bathrooms and kitchens."
+      }
+    ]
+  },
+  "commerce": {
+    "type": "mock",
+    "mock": {
+      "products": [
+        {
+          "id": "tile-101",
+          "title": "Calacatta Gold Polished Porcelain Tile 60x120cm",
+          "price": { "regular": 38.5, "currency": "USD", "formatted": "$38.50/sqm" },
+          "description": "Luxurious white marble effect glazed porcelain tile with golden veining. Suitable for floors and walls.",
+          "inStock": true,
+          "featuredImage": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&auto=format&fit=crop&q=80"
+        },
+        {
+          "id": "tile-102",
+          "title": "Nordic Oak Wood Effect Ceramic Plank 20x120cm",
+          "price": { "regular": 29.0, "currency": "USD", "formatted": "$29.00/sqm" },
+          "description": "Natural rustic wood effect tile with anti-slip matte finish. Water and scratch resistant.",
+          "inStock": true,
+          "featuredImage": "https://images.unsplash.com/photo-1581858726788-75bc0f6a952d?w=400&auto=format&fit=crop&q=80"
+        },
+        {
+          "id": "tile-103",
+          "title": "Anthracite Slate Anti-Slip Floor Tile 60x60cm",
+          "price": { "regular": 24.5, "currency": "USD", "formatted": "$24.50/sqm" },
+          "description": "Contemporary dark slate texture porcelain tile for modern bathrooms, hallways, and outdoor patios.",
+          "inStock": true,
+          "featuredImage": "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&auto=format&fit=crop&q=80"
+        }
+      ]
+    }
+  },
+  "ai": {
+    "provider": "openrouter",
+    "model": "recursive/flint-v1.0:free",
+    "temperature": 0.3,
+    "supportedLanguages": ["en", "ur", "roman_ur", "hi"]
+  },
+  "activeTools": [
+    "tile_calculator",
+    "search_products",
+    "get_product_details",
+    "add_to_cart",
+    "get_company_info"
+  ]
+}
