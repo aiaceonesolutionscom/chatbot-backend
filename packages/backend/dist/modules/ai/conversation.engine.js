@@ -38,22 +38,21 @@ export class ConversationEngine {
         catch (e) {
             console.warn(`[ConversationEngine] Failed to fetch products for tenant ${tenant.siteKey}:`, e);
         }
-        // 3. Query OpenRouter LLM with dynamic universal conversational prompt & multi-turn memory
-        const openRouterApiKey = process.env.OPENROUTER_API_KEY || tenant.ai?.apiKey;
-        if (openRouterApiKey && openRouterApiKey.startsWith('sk-or-')) {
-            try {
-                const aiResponse = await this.askAI(input, storeProducts, openRouterApiKey);
-                if (aiResponse) {
-                    // Record successful turn in session memory
-                    this.recordTurn(conversationId, trimmedMessage, aiResponse.message);
-                    return aiResponse;
-                }
-            }
-            catch (err) {
-                console.warn(`[ConversationEngine] OpenRouter error for ${tenant.siteKey}, fallback:`, err);
+        // 3. Query AI (Primary: Groq Cloud 14,400 req/day -> Secondary: OpenRouter)
+        const groqApiKey = process.env.GROQ_API_KEY || tenant.ai?.groqApiKey || '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';
+        const openRouterApiKey = process.env.OPENROUTER_API_KEY || tenant.ai?.openrouterApiKey || tenant.ai?.apiKey;
+        try {
+            const aiResponse = await this.askAI(input, storeProducts, groqApiKey, openRouterApiKey);
+            if (aiResponse) {
+                // Record successful turn in session memory
+                this.recordTurn(conversationId, trimmedMessage, aiResponse.message);
+                return aiResponse;
             }
         }
-        // 4. Fallback only if OpenRouter network fails
+        catch (err) {
+            console.warn(`[ConversationEngine] AI query error for ${tenant.siteKey}, fallback:`, err);
+        }
+        // 4. Bulletproof Fallback Knowledge Base (Only if both Groq and OpenRouter are unreachable)
         const fallback = this.fallbackResponse(input, storeProducts);
         this.recordTurn(conversationId, trimmedMessage, fallback.message);
         return fallback;
@@ -118,9 +117,8 @@ export class ConversationEngine {
             this.sessionHistory.set(conversationId, history.slice(-10));
         }
     }
-    static async askAI(input, storeProducts, apiKey) {
+    static async askAI(input, storeProducts, groqApiKey, openRouterApiKey) {
         const { conversationId, message, tenant } = input;
-        const model = process.env.OPENROUTER_MODEL || tenant.ai?.model || 'recursive/flint-v1.0:free';
         const companyName = tenant.brand?.companyName || tenant.company?.businessName || 'Colbolt';
         const assistantName = tenant.brand?.assistantName || 'COLBOLT.';
         const storeUrl = tenant.commerce?.woocommerce?.storeUrl || 'https://colbolt.hawksnfox.com';
@@ -180,55 +178,99 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
             ...pastTurns.map(t => ({ role: t.role, content: t.content })),
             { role: 'user', content: message }
         ];
-        // Model candidate list with fast failover
-        const candidateModels = Array.from(new Set([
-            process.env.OPENROUTER_MODEL,
-            tenant.ai?.model,
-            'openrouter/free',
-            'nvidia/nemotron-3.5-lightning:free'
-        ].filter(Boolean)));
         let replyText = null;
-        for (const currentModel of candidateModels) {
-            if (replyText)
-                break;
-            for (let attempt = 1; attempt <= 2; attempt++) {
+        // 1. PRIMARY AI: GROQ CLOUD (14,400 Free Requests/Day, ~250ms ultra-low latency)
+        if (groqApiKey && groqApiKey.startsWith('gsk_')) {
+            const groqModels = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b'];
+            for (const gm of groqModels) {
+                if (replyText)
+                    break;
                 const ctrl = new AbortController();
-                const timeoutId = setTimeout(() => ctrl.abort(), 12000); // 12s timeout to prevent freeze
+                const timeoutId = setTimeout(() => ctrl.abort(), 6000);
                 try {
-                    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                         method: 'POST',
                         signal: ctrl.signal,
                         headers: {
-                            'Authorization': `Bearer ${apiKey}`,
-                            'HTTP-Referer': storeUrl,
-                            'X-Title': `${companyName} AI Assistant`,
+                            'Authorization': `Bearer ${groqApiKey}`,
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            model: currentModel,
+                            model: gm,
                             messages: conversationMessages,
                             temperature: 0.25,
-                            max_tokens: 2500
+                            max_tokens: 1500
                         })
                     });
                     clearTimeout(timeoutId);
-                    if (!response.ok) {
-                        console.warn(`[OpenRouter] Model ${currentModel} HTTP status ${response.status}`);
-                        break; // Try next candidate model immediately
+                    if (res.ok) {
+                        const data = (await res.json());
+                        const content = data.choices?.[0]?.message?.content?.trim();
+                        if (content) {
+                            replyText = content;
+                            break;
+                        }
                     }
-                    const data = (await response.json());
-                    const content = data.choices?.[0]?.message?.content?.trim();
-                    if (content) {
-                        replyText = content;
-                        break;
+                    else {
+                        console.warn(`[Groq] Model ${gm} HTTP ${res.status}`);
                     }
                 }
                 catch (e) {
                     clearTimeout(timeoutId);
-                    console.warn(`[OpenRouter] Model ${currentModel} attempt ${attempt} failed: ${e.message}`);
-                    if (attempt === 1) {
-                        await new Promise(r => setTimeout(r, 400));
-                        continue;
+                    console.warn(`[Groq] Model ${gm} attempt failed: ${e.message}`);
+                }
+            }
+        }
+        // 2. SECONDARY AI: OpenRouter (Candidate failover)
+        if (!replyText && openRouterApiKey && openRouterApiKey.startsWith('sk-or-')) {
+            const candidateModels = Array.from(new Set([
+                process.env.OPENROUTER_MODEL,
+                tenant.ai?.model,
+                'openrouter/free',
+                'nvidia/nemotron-3.5-lightning:free'
+            ].filter(Boolean)));
+            for (const currentModel of candidateModels) {
+                if (replyText)
+                    break;
+                for (let attempt = 1; attempt <= 2; attempt++) {
+                    const ctrl = new AbortController();
+                    const timeoutId = setTimeout(() => ctrl.abort(), 8000);
+                    try {
+                        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                            method: 'POST',
+                            signal: ctrl.signal,
+                            headers: {
+                                'Authorization': `Bearer ${openRouterApiKey}`,
+                                'HTTP-Referer': storeUrl,
+                                'X-Title': `${companyName} AI Assistant`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                model: currentModel,
+                                messages: conversationMessages,
+                                temperature: 0.25,
+                                max_tokens: 2000
+                            })
+                        });
+                        clearTimeout(timeoutId);
+                        if (!response.ok) {
+                            console.warn(`[OpenRouter] Model ${currentModel} HTTP status ${response.status}`);
+                            break;
+                        }
+                        const data = (await response.json());
+                        const content = data.choices?.[0]?.message?.content?.trim();
+                        if (content) {
+                            replyText = content;
+                            break;
+                        }
+                    }
+                    catch (e) {
+                        clearTimeout(timeoutId);
+                        console.warn(`[OpenRouter] Model ${currentModel} attempt ${attempt} failed: ${e.message}`);
+                        if (attempt === 1) {
+                            await new Promise(r => setTimeout(r, 400));
+                            continue;
+                        }
                     }
                 }
             }
