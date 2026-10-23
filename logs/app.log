@@ -9,3 +9,9 @@
 [2026-10-23 12:42:36] [INFO] [Tenant Registered] Colbolt (colbolt_live), Tiles Master (tiles_master)
 [2026-10-23 12:51:42] [INFO] [Universal Chatbot Backend] Server running at http://0.0.0.0:3000
 [2026-10-23 12:51:42] [INFO] [Tenant Registered] Colbolt (colbolt_live), Tiles Master (tiles_master)
+[2026-10-23 13:18:26] [INFO] [Chat] [colbolt_live] processed in 5940ms | {"message":"hello","cardsCount":0}
+[2026-10-23 13:19:11] [INFO] [Chat] [colbolt_live] processed in 6926ms | {"message":"tumharay apas kai kai hai??","cardsCount":7}
+[2026-10-23 13:19:39] [INFO] [Chat] [colbolt_live] processed in 3454ms | {"message":"in english","cardsCount":0}
+[2026-10-23 13:20:32] [INFO] [Chat] [colbolt_live] processed in 2916ms | {"message":"what products you have","cardsCount":0}
+[2026-10-23 13:21:22] [INFO] [Chat] [colbolt_live] processed in 1525ms | {"message":"Show all products","cardsCount":7}
+[2026-10-23 13:21:39] [INFO] [Chat] [colbolt_live] processed in 2842ms | {"message":"tirz product dkehao buget hai 200 dolar","cardsCount":3}

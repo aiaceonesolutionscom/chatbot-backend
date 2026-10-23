@@ -74,6 +74,7 @@
   "ai": {
     "provider": "openrouter",
     "model": "openrouter/free",
+    "apiKey": "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",
     "temperature": 0.25,
     "maxTokens": 3000,
     "supportedLanguages": ["en", "ur", "roman_ur", "hi"],

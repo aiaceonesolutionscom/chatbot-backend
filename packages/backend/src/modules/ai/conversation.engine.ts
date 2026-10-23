@@ -441,7 +441,7 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
 
     const isUrdu = /(kya|hai|hain|karo|karein|mujhay|mujh|batao|bataen|aap|tum|kaise|kaisay|chahiye|chahaiye|ye|yeh|wo|woh|nhi|nahi|nhin|kitnay|kitna|kaam|baat|dikhao|dikhaen|paas)/i.test(msgLower);
 
-    // 1. Budget specified
+    // 1. Budget specified (e.g. "my budget is 5 dollars", "in 15 dollar", "$15")
     const budgetMatch = msgLower.match(/(\d+)\s*(?:dollar|\$|usd)/i);
     if (budgetMatch) {
       const budget = parseInt(budgetMatch[1], 10);
@@ -461,8 +461,47 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
       };
     }
 
-    // 2. User asking to view catalog or see what products are available (e.g. "mujhay dikhao tumharay paas kya kya hai")
-    const isCatalogInquiry = /\b(dikhao|dikhaen|kya kya|kai kai|tumharay paas|tumhare paas|show me|what do you have|all products|catalog|list|available items|kya hai)\b/i.test(msgLower);
+    // 2. Shipping & Delivery Policy Inquiry
+    const isShippingInquiry = /\b(shipping|delivery|dispatch|track|tracking|ship|courier|transport|rawana|bhejna|kab tak|how long|arrive|days)\b/i.test(msgLower);
+    if (isShippingInquiry) {
+      const shippingText = tenant.company?.shippingPolicy || 'Orders are processed securely and dispatched within 24-48 business hours with tracking provided.';
+      const deliveryText = tenant.company?.deliveryEstimate || 'Standard US shipping takes 3-5 business days; expedited options available at checkout.';
+      const msg = isUrdu
+        ? `${companyName} ki shipping policy: Hamaray tamam orders 24-48 business hours ke andar securely dispatch hotay hain aur tracking number provide kiya jata hai. Standard delivery mein taqreeban 3-5 business days lagtay hain. Checkout ke waqt expedited options bhi dastyab hain.`
+        : `${companyName} Shipping Policy: ${shippingText} ${deliveryText}`;
+      return {
+        conversationId,
+        role: 'assistant',
+        message: msg,
+        productCards: undefined,
+        quickReplies: [
+          { label: 'Show All Products', actionText: 'Show all products' },
+          { label: `About ${companyName}`, actionText: `What does ${companyName} do?` }
+        ]
+      };
+    }
+
+    // 3. About Company / Store / Ecommerce Website Inquiry
+    const isCompanyInquiry = /\b(what does colbolt do|about colbolt|about you|who are you|about your|company|ecommerce website|website|store|about us|kya kaam|kya kartay|kya karte|batao website|platform|what is colbolt|tell me about)\b/i.test(msgLower);
+    if (isCompanyInquiry) {
+      const aboutText = tenant.company?.aboutUs || `${companyName} provides high-quality laboratory research solutions, compounds, and peptides with verified purity and discreet delivery.`;
+      const msg = isUrdu
+        ? `${companyName} aik premium online research supply platform hai. Hum certified laboratory research compounds, peptides (jesay Tirz, Retatrutide, Semaglutide) aur sterile diluents (Bacteriostatic Water) verified purity aur discreet packaging ke sath provide karte hain. Aap chat ke zariye direct pricing pooch saktay hain ya items ko Cart mein add kar saktay hain.`
+        : `${companyName} is an online biotechnology research supply store: ${aboutText} All products (including Tirz, Retatrutide, Semaglutide, and Bacteriostatic Water) are supplied strictly for qualified in-vitro and laboratory research.`;
+      return {
+        conversationId,
+        role: 'assistant',
+        message: msg,
+        productCards: undefined,
+        quickReplies: [
+          { label: 'Show All Products', actionText: 'Show all products' },
+          { label: 'Shipping Info', actionText: 'What is your shipping policy?' }
+        ]
+      };
+    }
+
+    // 4. Products / Catalog Inquiry (e.g. "can you tell me which product you have", "what products", "show all products", "catalog", "list")
+    const isCatalogInquiry = /\b(product|products|which product|what product|what you have|what do you have|all product|catalog|list|available items|dikhao|kya kya|kai kai|paas kya|inventory|sab dikhao|items|stock)\b/i.test(msgLower);
     if (isCatalogInquiry) {
       const msg = isUrdu
         ? `Bilkul! ${companyName} ke paas verified laboratory research compounds aur diluents available hain. Neeche hamare live catalog ke items hain jahan se aap directly details dekh saktay hain ya Add to Cart kar saktay hain:`
@@ -479,7 +518,7 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
       };
     }
 
-    // 3. Specific product or dosage inquired
+    // 5. Specific product or dosage inquired (e.g. "Semaglutide 5mg", "Tirz 10mg", "Bacteriostatic Water")
     const relevantCards = this.matchProductsPrecisely(storeProducts, message, '');
     if (relevantCards.length > 0) {
       const p = relevantCards[0];
@@ -498,20 +537,58 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
       };
     }
 
-    // 4. Pure greeting / Welcome
-    const isPureGreeting = /^(hello|hi|hey|salam|asalam|aoa|kya haal|how are you)[\s!.,?]*$/i.test(msgLower);
-    const greetingMsg = isUrdu
-      ? `Assalam-o-Alaikum! ${companyName} customer support mein khush-aamdeed. Main laboratory research compounds, diluents, pricing aur orders ke hawale se aapki madad kar sakta hoon. Aaj main aapki kya madad karoon?`
-      : `Hello! Welcome to ${companyName}. I can assist you with laboratory research compounds, pricing, availability, and placing orders. How can I help you today?`;
+    // 6. Payment, Ordering & Checkout Inquiry
+    const isPaymentInquiry = /\b(pay|payment|card|bank|checkout|buy|order|cod|bacs|purchase|khareedna|kaise khareedein)\b/i.test(msgLower);
+    if (isPaymentInquiry) {
+      const msg = isUrdu
+        ? `Colbolt par order karna bohat aasan hai! Aap kisi bhi product card ke upar **"Add to Cart"** button daba kar usay direct cart mein add kar saktay hain. Iske baad aap https://colbolt.hawksnfox.com/checkout/ par ja kar direct bank transfer ya available payment options ke sath order complete kar saktay hain.`
+        : `Ordering at ${companyName} is fast and seamless! You can click the "Add to Cart" button on any product card in this chat. Once added, proceed to checkout at ${tenant.commerce?.woocommerce?.storeUrl || 'https://colbolt.hawksnfox.com'}/checkout/ to complete your order securely.`;
+      return {
+        conversationId,
+        role: 'assistant',
+        message: msg,
+        productCards: undefined,
+        quickReplies: [
+          { label: 'Show All Products', actionText: 'Show all products' },
+          { label: 'Shipping Info', actionText: 'What is your shipping policy?' }
+        ]
+      };
+    }
+
+    // 7. Pure greeting / Welcome (ONLY when message is strictly a greeting)
+    const isPureGreeting = /^(hello|hi|hey|heyy|salam|asalam|assalam|aoa|kya haal|how are you|good morning|good afternoon|good evening)[\s!.,?]*$/i.test(msgLower);
+    if (isPureGreeting) {
+      const greetingMsg = isUrdu
+        ? `Assalam-o-Alaikum! ${companyName} customer support mein khush-aamdeed. Main laboratory research compounds, diluents, pricing aur orders ke hawale se aapki madad kar sakta hoon. Aaj main aapki kya madad karoon?`
+        : `Hello! Welcome to ${companyName}. I can assist you with laboratory research compounds, pricing, availability, and placing orders. How can I help you today?`;
+
+      return {
+        conversationId,
+        role: 'assistant',
+        message: greetingMsg,
+        productCards: undefined, // Pure greetings NEVER have product cards!
+        quickReplies: [
+          { label: 'Show All Products', actionText: 'Show all products' },
+          { label: 'Shipping Info', actionText: 'What is your shipping policy?' },
+          { label: `About ${companyName}`, actionText: `What does ${companyName} do?` }
+        ]
+      };
+    }
+
+    // 8. General domain-aligned response for unrecognized messages
+    const generalMsg = isUrdu
+      ? `Main ${companyName} customer support assistant hoon. Main hamaray research compounds (jesay Tirz, Retatrutide, Semaglutide, Bacteriostatic Water), pricing, availability, shipping policies, ya cart mein add karnay ke hawale se aapki madad kar sakta hoon. Aap kis baray mein janna chahtay hain?`
+      : `I am your ${companyName} customer care assistant. I can assist you with product availability, exact pricing, shipping details, or adding items directly to your cart. How can I assist with your research inquiry today?`;
 
     return {
       conversationId,
       role: 'assistant',
-      message: greetingMsg,
-      productCards: undefined, // Pure greetings NEVER have product cards!
+      message: generalMsg,
+      productCards: undefined,
       quickReplies: [
         { label: 'Show All Products', actionText: 'Show all products' },
-        { label: 'Shipping Info', actionText: 'What is your shipping policy?' }
+        { label: 'Shipping Info', actionText: 'What is your shipping policy?' },
+        { label: `About ${companyName}`, actionText: `What does ${companyName} do?` }
       ]
     };
   }

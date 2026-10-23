@@ -1,19 +1,19 @@
 {
   "colbolt_live": {
     "allTime": {
-      "messages": 3,
-      "tokens": 636
+      "messages": 9,
+      "tokens": 1420
     },
     "daily": {
       "2026-10-23": {
-        "messages": 3,
-        "tokens": 636
+        "messages": 9,
+        "tokens": 1420
       }
     },
     "monthly": {
       "2026-10": {
-        "messages": 3,
-        "tokens": 636
+        "messages": 9,
+        "tokens": 1420
       }
     }
   }

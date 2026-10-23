@@ -22,3 +22,57 @@ Kya main aapko checkout link bhej doon ya koi aur sawal hai?
 CARDS ATTACHED (2): Semaglutide 5mg ($375.00), Bacteriostatic Water 10mg ($15.00)
 ================================================================================
 
+================================================================================
+TIMESTAMP : 2026-10-23 13:18:26 | CLIENT: [colbolt_live] | SESSION: conv_1792761485818
+LATENCY   : 5940ms
+USER ASKED: "hello"
+BOT REPLIED:
+Hello! Welcome to Colbolt. I can assist you with laboratory research compounds, pricing, availability, and placing orders. How can I help you today?
+CARDS ATTACHED: None (0 cards)
+================================================================================
+
+================================================================================
+TIMESTAMP : 2026-10-23 13:19:11 | CLIENT: [colbolt_live] | SESSION: conv_1792761485818
+LATENCY   : 6926ms
+USER ASKED: "tumharay apas kai kai hai??"
+BOT REPLIED:
+Bilkul! Colbolt ke paas verified laboratory research compounds aur diluents available hain. Neeche hamare live catalog ke items hain jahan se aap directly details dekh saktay hain ya Add to Cart kar saktay hain:
+CARDS ATTACHED (7): Bacteriostatic Water 10mg ($15.00), Retatrutide ($225.00), Tirz 60mg ($675.00), Tirz 30mg ($375.00), Tirz 10mg ($150.00), Semaglutide 10mg ($575.00), Semaglutide 5mg ($375.00)
+================================================================================
+
+================================================================================
+TIMESTAMP : 2026-10-23 13:19:39 | CLIENT: [colbolt_live] | SESSION: conv_1792761485818
+LATENCY   : 3454ms
+USER ASKED: "in english"
+BOT REPLIED:
+Hello! Welcome to Colbolt. I can assist you with laboratory research compounds, pricing, availability, and placing orders. How can I help you today?
+CARDS ATTACHED: None (0 cards)
+================================================================================
+
+================================================================================
+TIMESTAMP : 2026-10-23 13:20:32 | CLIENT: [colbolt_live] | SESSION: conv_1792761485818
+LATENCY   : 2916ms
+USER ASKED: "what products you have"
+BOT REPLIED:
+Hello! Welcome to Colbolt. I can assist you with laboratory research compounds, pricing, availability, and placing orders. How can I help you today?
+CARDS ATTACHED: None (0 cards)
+================================================================================
+
+================================================================================
+TIMESTAMP : 2026-10-23 13:21:22 | CLIENT: [colbolt_live] | SESSION: conv_1792761485818
+LATENCY   : 1525ms
+USER ASKED: "Show all products"
+BOT REPLIED:
+Certainly! Here are the verified laboratory research compounds and diluents available at Colbolt. You can view details or add items directly to your cart:
+CARDS ATTACHED (7): Bacteriostatic Water 10mg ($15.00), Retatrutide ($225.00), Tirz 60mg ($675.00), Tirz 30mg ($375.00), Tirz 10mg ($150.00), Semaglutide 10mg ($575.00), Semaglutide 5mg ($375.00)
+================================================================================
+
+================================================================================
+TIMESTAMP : 2026-10-23 13:21:39 | CLIENT: [colbolt_live] | SESSION: conv_1792761485818
+LATENCY   : 2842ms
+USER ASKED: "tirz product dkehao buget hai 200 dolar"
+BOT REPLIED:
+Aapka matlooba item **Tirz 60mg** ($675.00) hamare paas stock mein available hai ✅. Research peptides ke sath sterile dilution ke liye **Bacteriostatic Water 10mg** ($15.00) diluent zaroori hota hai jo hamare paas available hai. Kya aap isay cart mein add karna chahtay hain?
+CARDS ATTACHED (3): Tirz 60mg ($675.00), Tirz 30mg ($375.00), Tirz 10mg ($150.00)
+================================================================================
+
