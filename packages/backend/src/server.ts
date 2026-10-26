@@ -474,10 +474,11 @@ export async function buildServer(): Promise<FastifyInstance> {
     message: string;
     shopperSessionId?: string;
     userLanguage?: string;
+    cartItems?: any[];
   }
 
   server.post('/api/chat/message', async (req: FastifyRequest<{ Body: ChatMessageBody }>, reply: FastifyReply) => {
-    const { siteKey, conversationId, message, shopperSessionId, userLanguage } = req.body || {};
+    const { siteKey, conversationId, message, shopperSessionId, userLanguage, cartItems } = req.body || {};
 
     if (!siteKey || !message) {
       return reply.status(400).send({ error: 'siteKey and message are required fields.' });
@@ -497,7 +498,8 @@ export async function buildServer(): Promise<FastifyInstance> {
         message,
         tenant,
         shopperSessionId,
-        userLanguage
+        userLanguage,
+        cartItems
       });
 
       const durationMs = Date.now() - startTime;
@@ -543,10 +545,11 @@ export async function buildServer(): Promise<FastifyInstance> {
     variantId?: string;
     quantity?: number;
     shopperSessionId?: string;
+    conversationId?: string;
   }
 
   server.post('/api/cart/add', async (req: FastifyRequest<{ Body: AddToCartBody }>, reply: FastifyReply) => {
-    const { siteKey, productId, variantId, quantity = 1, shopperSessionId } = req.body || {};
+    const { siteKey, productId, variantId, quantity = 1, shopperSessionId, conversationId } = req.body || {};
 
     if (!siteKey || !productId) {
       return reply.status(400).send({ error: 'siteKey and productId are required.' });
@@ -561,6 +564,16 @@ export async function buildServer(): Promise<FastifyInstance> {
     try {
       const result = await adapter.addToCart(productId, variantId, quantity, { shopperSessionId });
       AppLogger.info(`[Cart] [${siteKey}] Added product ${productId} (qty: ${quantity})`);
+
+      if (conversationId && result.addedItem) {
+        ConversationEngine.addToSessionCart(conversationId, {
+          id: String(result.addedItem.id || productId),
+          title: result.addedItem.title,
+          price: result.addedItem.unitPrice,
+          quantity: result.addedItem.quantity
+        });
+      }
+
       return result;
     } catch (err: unknown) {
       AppLogger.error(`[Cart] [${siteKey}] Add to cart failed for product ${productId}`, err);
@@ -572,8 +585,8 @@ export async function buildServer(): Promise<FastifyInstance> {
   });
 
   // Dedicated Remove from Cart ("Un-cart") endpoint
-  server.post('/api/cart/remove', async (req: FastifyRequest<{ Body: { siteKey: string; productId: string; shopperSessionId?: string } }>, reply: FastifyReply) => {
-    const { siteKey, productId, shopperSessionId } = req.body || {};
+  server.post('/api/cart/remove', async (req: FastifyRequest<{ Body: { siteKey: string; productId: string; shopperSessionId?: string; conversationId?: string } }>, reply: FastifyReply) => {
+    const { siteKey, productId, shopperSessionId, conversationId } = req.body || {};
     if (!siteKey || !productId) {
       return reply.status(400).send({ error: 'siteKey and productId are required.' });
     }
@@ -581,24 +594,38 @@ export async function buildServer(): Promise<FastifyInstance> {
     if (!tenant) return reply.status(404).send({ error: 'Tenant not found.' });
 
     const adapter = CommerceAdapterFactory.getAdapter(tenant);
-    if (adapter.removeFromCart) {
-      return await adapter.removeFromCart(productId, { shopperSessionId });
+    try {
+      if (adapter.removeFromCart) {
+        await adapter.removeFromCart(productId, { shopperSessionId });
+      }
+      if (conversationId) {
+        ConversationEngine.removeFromSessionCart(conversationId, productId);
+      }
+      return { success: true, message: 'Item removed from cart.' };
+    } catch (err: unknown) {
+      return reply.status(500).send({ success: false, message: 'Failed to remove from cart.' });
     }
-    return { success: true, message: 'Item removed from cart.' };
   });
 
   // Dedicated Clear Cart endpoint
-  server.post('/api/cart/clear', async (req: FastifyRequest<{ Body: { siteKey: string; shopperSessionId?: string } }>, reply: FastifyReply) => {
-    const { siteKey, shopperSessionId } = req.body || {};
+  server.post('/api/cart/clear', async (req: FastifyRequest<{ Body: { siteKey: string; shopperSessionId?: string; conversationId?: string } }>, reply: FastifyReply) => {
+    const { siteKey, shopperSessionId, conversationId } = req.body || {};
     if (!siteKey) return reply.status(400).send({ error: 'siteKey is required.' });
     const tenant = TenantStore.getBySiteKey(siteKey);
     if (!tenant) return reply.status(404).send({ error: 'Tenant not found.' });
 
     const adapter = CommerceAdapterFactory.getAdapter(tenant);
-    if (adapter.clearCart) {
-      return await adapter.clearCart({ shopperSessionId });
+    try {
+      if (adapter.clearCart) {
+        await adapter.clearCart({ shopperSessionId });
+      }
+      if (conversationId) {
+        ConversationEngine.clearSessionCart(conversationId);
+      }
+      return { success: true, message: 'Cart cleared successfully.' };
+    } catch (err: unknown) {
+      return reply.status(500).send({ success: false, message: 'Failed to clear cart.' });
     }
-    return { success: true, message: 'Cart cleared.' };
   });
 
   // Dedicated Order Tracking endpoint

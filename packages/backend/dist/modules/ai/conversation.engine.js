@@ -6,6 +6,46 @@ export class ConversationEngine {
      */
     static sessionHistory = new Map();
     /**
+     * In-Memory Session Cart Tracker per Conversation ID
+     * Remembers what items the shopper has added, removed, or reviewed in this conversation session.
+     */
+    static sessionCarts = new Map();
+    static getSessionCart(conversationId) {
+        return this.sessionCarts.get(conversationId) || [];
+    }
+    static addToSessionCart(conversationId, item) {
+        const list = this.sessionCarts.get(conversationId) || [];
+        const existing = list.find(x => x.id === item.id || x.title.toLowerCase() === item.title.toLowerCase());
+        if (existing) {
+            existing.quantity += item.quantity;
+        }
+        else {
+            list.push({ ...item });
+        }
+        this.sessionCarts.set(conversationId, list);
+    }
+    static removeFromSessionCart(conversationId, itemKeyOrTitle) {
+        const list = this.sessionCarts.get(conversationId) || [];
+        const term = itemKeyOrTitle.toLowerCase().trim();
+        const index = list.findIndex(x => x.id === term ||
+            x.title.toLowerCase().includes(term) ||
+            term.includes(x.title.toLowerCase().split(/\s+/)[0]));
+        if (index !== -1) {
+            const [removed] = list.splice(index, 1);
+            this.sessionCarts.set(conversationId, list);
+            return removed;
+        }
+        return undefined;
+    }
+    static clearSessionCart(conversationId) {
+        this.sessionCarts.delete(conversationId);
+    }
+    static syncSessionCart(conversationId, items) {
+        if (Array.isArray(items)) {
+            this.sessionCarts.set(conversationId, [...items]);
+        }
+    }
+    /**
      * Anti-Troll & Anti-Time-Waster State Tracker
      * Tracks repeated casual pleasantries (e.g. "kese hoo", "kya haal hai") without business intent.
      * - 1st time: Warm greeting & readiness to help with Colbolt products.
@@ -140,27 +180,85 @@ export class ConversationEngine {
         const storeUrl = tenant.commerce?.woocommerce?.storeUrl || 'https://colbolt.hawksnfox.com';
         const companyName = tenant.brand?.companyName || tenant.company?.businessName || 'Colbolt';
         // 2A. UN-CART / REMOVE FROM CART HANDLER
-        const isUncartIntent = /\b(remove|delete|uncart|un-cart|hata|hatao|nikaal|nikal|kam karo)\b.*\b(from cart|se cart|cart se|out of cart)\b/i.test(msgLower) ||
-            /\b(cart se)\b.*\b(hata|hatao|nikaal|nikal|delete|remove|kam)\b/i.test(msgLower) ||
-            /\b(uncart|un-cart|remove from cart)\b/i.test(msgLower);
+        // Matches: "tirz hata doo", "tirz hata do", "remove tirz", "water nikal do", "delete tirz", "cart se tirz hata do", "hata do", etc.
+        const removeKeywords = /\b(remove|delete|uncart|un-cart|hata|hatao|nikaal|nikal|nikalo|drop|kam karo|minus)\b/i;
+        const isCartWord = /\b(cart|shopping cart|basket|tokri)\b/i.test(msgLower);
+        // Check if user mentions a known compound or store product title
+        const matchedStoreProduct = storeProducts.find(p => {
+            const titleLower = p.title.toLowerCase();
+            const firstWord = titleLower.split(/\s+/)[0];
+            return msgLower.includes(titleLower) || msgLower.includes(firstWord);
+        });
+        const isExplicitUncart = isCartWord && removeKeywords.test(msgLower);
+        const isProductRemoval = removeKeywords.test(msgLower) && (!!matchedStoreProduct || /\b(tirz|sema|semaglutide|water|retatrutide|item|product|yeh|ye|woh|wo|it)\b/i.test(msgLower));
+        const isCartSePrefix = /\bcart\s*se\b/i.test(msgLower);
+        const isUncartIntent = isExplicitUncart || isProductRemoval || isCartSePrefix;
         if (isUncartIntent) {
-            const matched = storeProducts.find(p => msgLower.includes(p.title.toLowerCase()) || msgLower.includes(p.title.toLowerCase().split(/\s+/)[0]));
-            const title = matched ? matched.title : 'Item';
-            if (matched && adapter.removeFromCart) {
-                adapter.removeFromCart(matched.id, { shopperSessionId: input.shopperSessionId }).catch(() => { });
+            // 1. Try to find the matching item in the active session cart first
+            const sessionItems = ConversationEngine.getSessionCart(conversationId);
+            let targetItem = sessionItems.find(it => {
+                const titleLower = it.title.toLowerCase();
+                const firstWord = titleLower.split(/\s+/)[0];
+                return msgLower.includes(titleLower) || msgLower.includes(firstWord);
+            });
+            // If user mentioned specific dosage (e.g. "10mg"), refine search
+            const dosageMatch = msgLower.match(/(\d+\s*mg)/i);
+            if (dosageMatch) {
+                const dosageStr = dosageMatch[1].toLowerCase().replace(/\s+/, '');
+                const doseSpecific = sessionItems.find(it => it.title.toLowerCase().replace(/\s+/, '').includes(dosageStr));
+                if (doseSpecific)
+                    targetItem = doseSpecific;
+            }
+            // If not in session cart but in store catalog, use matched store product
+            let title = 'Selected Item';
+            let targetId = 'item';
+            if (targetItem) {
+                title = targetItem.title;
+                targetId = targetItem.id;
+            }
+            else if (matchedStoreProduct) {
+                title = matchedStoreProduct.title;
+                targetId = matchedStoreProduct.id;
+            }
+            else if (sessionItems.length === 1) {
+                title = sessionItems[0].title;
+                targetId = sessionItems[0].id;
+            }
+            // Remove from session tracker
+            ConversationEngine.removeFromSessionCart(conversationId, targetId);
+            ConversationEngine.removeFromSessionCart(conversationId, title);
+            // Execute adapter removal
+            if (adapter.removeFromCart) {
+                adapter.removeFromCart(targetId, { shopperSessionId: input.shopperSessionId }).catch(() => { });
+            }
+            const remainingItems = ConversationEngine.getSessionCart(conversationId);
+            let remainingSummary = '';
+            if (remainingItems.length > 0) {
+                const remList = remainingItems
+                    .map((it, idx) => `${idx + 1}. **${it.title}** (${it.quantity}x) — $${(it.price * it.quantity).toFixed(2)}`)
+                    .join('\n');
+                const remSubtotal = remainingItems.reduce((acc, it) => acc + (it.price * it.quantity), 0);
+                remainingSummary = isUrduLang
+                    ? `\n\n🛒 **Aapke cart mein baqi yeh products shamil hain**:\n${remList}\n💵 **Updated Total**: $${remSubtotal.toFixed(2)}\n\n🔗 [View Full Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)`
+                    : `\n\n🛒 **Remaining items in your cart**:\n${remList}\n💵 **Updated Total**: $${remSubtotal.toFixed(2)}\n\n🔗 [View Full Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)`;
+            }
+            else {
+                remainingSummary = isUrduLang
+                    ? `\n\nAapka shopping cart ab khali hai. Agar aap koi aur compound browse karna chahein to zaroor batayein!`
+                    : `\n\nYour shopping cart is now empty. Let me know if you would like to explore our live catalog!`;
             }
             const msg = isUrduLang
-                ? `✅ **${title}** aapke shopping cart se remove kar diya gaya hai.\n\nAap apna updated cart check kar saktay hain ya mazeed products browse kar saktay hain:`
-                : `✅ **${title}** has been removed from your shopping cart.\n\nYou can review your updated cart or continue browsing:`;
+                ? `✅ **${title}** aapke shopping cart se remove kar diya gaya hai.${remainingSummary}`
+                : `✅ **${title}** has been removed from your shopping cart.${remainingSummary}`;
             const response = {
                 conversationId,
                 role: 'assistant',
                 message: msg,
-                productCards: undefined,
+                productCards: undefined, // NEVER attach product cards when uncarting
                 quickReplies: [
                     { label: 'View My Cart', actionText: 'Show my cart' },
                     { label: 'View All Products', actionText: 'Show all products' },
-                    { label: 'Checkout', actionText: 'Proceed to checkout' }
+                    { label: 'Proceed to Checkout', actionText: 'Proceed to checkout' }
                 ]
             };
             this.recordTurn(conversationId, trimmedMessage, msg);
@@ -169,6 +267,7 @@ export class ConversationEngine {
         // 2B. CLEAR CART HANDLER
         const isClearCartIntent = /\b(clear cart|empty cart|cart khali|sab hata do|poora cart khali|cart saaf)\b/i.test(msgLower);
         if (isClearCartIntent) {
+            ConversationEngine.clearSessionCart(conversationId);
             if (adapter.clearCart) {
                 adapter.clearCart({ shopperSessionId: input.shopperSessionId }).catch(() => { });
             }
@@ -188,12 +287,41 @@ export class ConversationEngine {
             this.recordTurn(conversationId, trimmedMessage, msg);
             return response;
         }
-        // 2C. VIEW CART HANDLER
-        const isViewCartIntent = /\b(view cart|show cart|my cart|mere cart|check cart|cart dikhao|cart check|cart mein kya|cart me kya)\b/i.test(msgLower);
+        // 2C. VIEW / INSPECT CART HANDLER
+        const isViewCartIntent = /\b(view cart|show cart|my cart|mere cart|check cart|cart dikhao|cart check|cart mein kya|cart me kya|cart mai)\b/i.test(msgLower) ||
+            /\b(kon|kaun|which|kya)\b.*\b(product|products|item|items|compounds?)\b.*\b(sleect|select|add|liye|hain|hai|choose)\b/i.test(msgLower) ||
+            /\b(kitnay|kitna|how many)\b.*\b(product|products|item|items)\b.*\b(cart|sleect|select|liye)\b/i.test(msgLower);
         if (isViewCartIntent) {
-            const msg = isUrduLang
-                ? `🛒 **Shopping Cart & Checkout Overview**:\n\nAapka cart live website session ke sath synchronized hai. Neeche diye gaye links se aap direct cart check kar saktay hain ya checkout complete kar saktay hain:\n\n🔗 [View Full Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)`
-                : `🛒 **Shopping Cart & Checkout Overview**:\n\nYour cart is synchronized with your active session. You can review your cart or finalize your purchase using the links below:\n\n🔗 [View Full Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)`;
+            const sessionItems = ConversationEngine.getSessionCart(conversationId);
+            let msg;
+            if (sessionItems.length > 0) {
+                const itemsList = sessionItems
+                    .map((it, idx) => `${idx + 1}. **${it.title}** (${it.quantity}x) — $${(it.price * it.quantity).toFixed(2)}`)
+                    .join('\n');
+                const subtotal = sessionItems.reduce((acc, it) => acc + (it.price * it.quantity), 0);
+                msg = isUrduLang
+                    ? `🛒 **Aapka Shopping Cart (${sessionItems.length} ${sessionItems.length === 1 ? 'Product' : 'Products'})**:\n\n` +
+                        `Aap ne is session mein yeh products select kiye hain:\n${itemsList}\n\n` +
+                        `💵 **Estimated Subtotal**: $${subtotal.toFixed(2)}\n\n` +
+                        `Aap direct neeche diye gaye links se cart review kar saktay hain ya checkout complete kar saktay hain:\n` +
+                        `🔗 [View Full Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)`
+                    : `🛒 **Your Shopping Cart (${sessionItems.length} ${sessionItems.length === 1 ? 'Product' : 'Products'})**:\n\n` +
+                        `You have selected the following items in this session:\n${itemsList}\n\n` +
+                        `💵 **Estimated Subtotal**: $${subtotal.toFixed(2)}\n\n` +
+                        `You can review your full cart or proceed to checkout using the links below:\n` +
+                        `🔗 [View Full Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)`;
+            }
+            else {
+                msg = isUrduLang
+                    ? `🛒 **Shopping Cart & Live Overview**:\n\n` +
+                        `Is chat session mein abhi koi product cart mein add nahi kiya gaya. Agar aapne website storefront se koi product direct add kiya hai to aap direct live cart page par check kar saktay hain:\n\n` +
+                        `🔗 [View Live Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)\n\n` +
+                        `Agar aap koi compound (jaise **Tirz 10mg** ya **Bacteriostatic Water**) cart mein add karna chahtay hain, to bas bata dijiye!`
+                    : `🛒 **Shopping Cart & Live Overview**:\n\n` +
+                        `No products have been added in this chat session yet. If you added items via our website storefront, you can review them directly on the cart page:\n\n` +
+                        `🔗 [View Live Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)\n\n` +
+                        `Let me know if you would like to add any compounds (e.g. **Tirz 10mg** or **Bacteriostatic Water**) to your cart!`;
+            }
             const response = {
                 conversationId,
                 role: 'assistant',
@@ -322,6 +450,46 @@ export class ConversationEngine {
                 this.recordTurn(conversationId, trimmedMessage, msg);
                 return response;
             }
+        }
+        // 2F. PROCEED TO CHECKOUT HANDLER
+        // Matches: "procced kardoo", "proceed", "proced", "checkout", "pay", "order place", "finalize", etc.
+        const isCheckoutIntent = /\b(proc[ce]+d|check\s*out|checkout\s*link|pay|payment|kareedo|order place|finalize|buy now)\b/i.test(msgLower) &&
+            !/\b(policy|refund|shipping|terms|about)\b/i.test(msgLower);
+        if (isCheckoutIntent) {
+            const sessionItems = ConversationEngine.getSessionCart(conversationId);
+            let itemsSummary = '';
+            if (sessionItems.length > 0) {
+                const total = sessionItems.reduce((acc, it) => acc + (it.price * it.quantity), 0);
+                itemsSummary = isUrduLang
+                    ? `\n\n🛒 **Aapke Cart Mein Selected Products**:\n` +
+                        sessionItems.map(it => `• **${it.title}** (${it.quantity}x) — $${(it.price * it.quantity).toFixed(2)}`).join('\n') +
+                        `\n💵 **Subtotal**: $${total.toFixed(2)}\n`
+                    : `\n\n🛒 **Selected Items in Your Cart**:\n` +
+                        sessionItems.map(it => `• **${it.title}** (${it.quantity}x) — $${(it.price * it.quantity).toFixed(2)}`).join('\n') +
+                        `\n💵 **Subtotal**: $${total.toFixed(2)}\n`;
+            }
+            const msg = isUrduLang
+                ? `💳 **Proceed to Checkout**:${itemsSummary}\n` +
+                    `Aapka direct secure checkout link neeche dastyab hai:\n\n` +
+                    `🔗 [Click Here to Complete Checkout](${storeUrl}/checkout/)\n\n` +
+                    `Apni shipping details enter karein aur secure payment select karke order confirm karein. Agar checkout mein koi issue ho to batayein! 😊`
+                : `💳 **Proceed to Checkout**:${itemsSummary}\n` +
+                    `You can finalize and place your order directly at our secure checkout:\n\n` +
+                    `🔗 [Click Here to Complete Checkout](${storeUrl}/checkout/)\n\n` +
+                    `Simply enter your delivery address and choose your payment method to complete your purchase!`;
+            const response = {
+                conversationId,
+                role: 'assistant',
+                message: msg,
+                productCards: undefined, // NEVER attach product cards when checking out
+                quickReplies: [
+                    { label: 'View Full Cart', actionText: 'Show my cart' },
+                    { label: 'Shipping Info', actionText: 'What is your shipping policy?' },
+                    { label: 'Show All Products', actionText: 'Show all products' }
+                ]
+            };
+            this.recordTurn(conversationId, trimmedMessage, msg);
+            return response;
         }
         // 3. Query AI (Primary: Groq Cloud 14,400 req/day -> Secondary: OpenRouter)
         const groqApiKey = process.env.GROQ_API_KEY || tenant.ai?.groqApiKey || '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';
@@ -473,6 +641,11 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
 12. FULL CART MANAGEMENT (ADD, UN-CART, VIEW CART, CLEAR CART):
    - You CAN add items to cart, remove items from cart ("un-cart"), display cart link, and empty cart upon request.
    - If customer asks to remove an item or uncart: Politely confirm the item has been removed from their cart.
+13. ZERO MANUAL STEP-BY-STEP CART REMOVAL TUTORIALS:
+   - UNDER NO CIRCUMSTANCES should you write a manual step-by-step tutorial (e.g. "1. Open cart in browser... 2. Find Tirz... 3. Click remove button... 4. Confirm popup") telling the customer to delete items themselves!
+   - You are an automated commerce agent. All cart actions (add, remove, clear) are performed automatically by the assistant.
+   - If a customer asks to remove, delete, or drop an item (e.g. "tirz hata do"), confirm immediately that it has been removed and provide direct links. NEVER output numbered tutorial steps!
+   - NEVER attach product cards when the customer is removing items, viewing cart, or checking out.
 `.trim();
         // Retrieve previous conversation turns for this session
         const pastTurns = this.sessionHistory.get(conversationId) || [];
@@ -584,6 +757,11 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
         // Clean any reasoning tags (<think>...</think>) or tool tags if emitted
         replyText = replyText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
         replyText = replyText.replace(/<tool_call>.*?<\/tool_call>/gis, '').replace(/<tool_call>.*$/gis, '').trim();
+        // Clean AI guardrail / safety tags (e.g. "User Safety: safeResponse Safety: safe")
+        replyText = replyText
+            .replace(/(?:User|Response)\s*Safety:\s*(?:safe|unsafe)\s*/gi, '')
+            .replace(/^(?:Safe|Unsafe)\s*\n/gi, '')
+            .trim();
         // 1. CLEAN MARKDOWN TABLES & PREVENT AESTHETIC CLUTTER:
         // Raw markdown tables break and look ugly in chat widgets; strip them and let visual cards display products
         if (/\|[^\n]+\|\r?\n\|[-:\s|]+\|\r?\n(?:\|[^\n]+\|\r?\n?)+/g.test(replyText)) {
@@ -611,20 +789,14 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
         }
         // High-Precision Product Matching: Respects exact compound, dosage & budget
         const relevantCards = this.matchProductsPrecisely(storeProducts, message, replyText, budgetNum);
-        // Extra safety: If relevantCards is empty BUT user asked for products/catalog or AI reply presented catalog:
-        let finalCards = relevantCards;
-        if (finalCards.length === 0) {
+        // Strict Guard: NEVER attach product cards if user query is cart removal, cart view, checkout, tracking, or cancellation
+        const isCartOrCheckoutOrRemoval = /\b(hata|hatao|nikaal|nikal|remove|delete|uncart|un-cart|drop|clear|empty cart|checkout|procc?eed|pay|payment|track|tracking|cancel order|shopping cart|mere cart|my cart|in my cart|kitnay product|kon kon sai product)\b/i.test(messageLower);
+        let finalCards = isCartOrCheckoutOrRemoval ? [] : relevantCards;
+        if (finalCards.length === 0 && !isCartOrCheckoutOrRemoval) {
             const isRefusal = replyLower.includes('ijazat nahi') || replyLower.includes('not authorized');
             const isPolicy = /\b(shipping|delivery|dispatch|refund|policy|policies)\b/i.test(messageLower) && !/\b(product|products|catalog|tirz|semaglutide|water|khareed|khared|buy|order)\b/i.test(messageLower);
-            // If AI reply literally talks about the catalog or mentions Add to Cart or mentions multiple products:
-            const aiReplyOffersCatalog = replyLower.includes('catalog') ||
-                replyLower.includes('add to cart') ||
-                replyLower.includes('dastyab') ||
-                replyLower.includes('neeche') ||
-                replyLower.includes('below') ||
-                replyLower.includes('cart mein') ||
-                (replyLower.includes('tirz') && replyLower.includes('semaglutide')) ||
-                (replyLower.includes('bacteriostatic') && replyLower.includes('retatrutide'));
+            const aiReplyOffersCatalog = /\b(neeche\s+(?:catalog|products?|cards?|diye gaye products?)|below\s+(?:catalog|products?|cards?|is our catalog)|live catalog|hamara catalog|catalog neeche)\b/i.test(replyLower) ||
+                (replyLower.includes('tirz') && replyLower.includes('semaglutide') && replyLower.includes('retatrutide'));
             const userAskedForProducts = /\b(product|products|catalog|item|items|inventory|stock|all|sab)\b/i.test(messageLower) ||
                 /\b(buy|order|purchase|khareed|khared|kharid|lena|mangwana|chahta|chahiye|khareedna|kharedna)\b/i.test(messageLower) ||
                 /\b(what (do you|do u|are you) (sell|have)|apke|aapke|tumharay|tumhare|tere|teray)\s*(paas|pas|apas)?\b/i.test(messageLower) ||

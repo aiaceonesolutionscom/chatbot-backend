@@ -34,6 +34,7 @@ export class UniversalCommerceWidget {
   private conversationId: string = `conv_${Date.now()}`;
   private config: WidgetTenantConfig | null = null;
   private isWaitingForResponse: boolean = false;
+  private cartItems: Array<{ id: string; title: string; price: number; quantity: number }> = [];
 
   constructor() {
     this.extractAttributes();
@@ -87,6 +88,14 @@ export class UniversalCommerceWidget {
     // Render Widget into Shadow DOM
     this.render();
     this.bindEvents();
+
+    // Synchronize active WordPress / WooCommerce live cart on page load
+    WooCommerceStorefrontBridge.fetchLiveCart().then(liveItems => {
+      if (liveItems && liveItems.length > 0) {
+        this.cartItems = liveItems;
+        this.updateCartUI();
+      }
+    }).catch(() => {});
   }
 
   private async fetchConfig(): Promise<void> {
@@ -160,14 +169,20 @@ export class UniversalCommerceWidget {
     const container = document.createElement('div');
     container.className = 'chatbot-container';
     container.innerHTML = `
-      <!-- High-End YANA Floating Pill Launcher -->
+      <!-- High-End Liquid Glass Floating Pill Launcher -->
       <div class="launcher-pill" id="launcherBtn" role="button" tabindex="0" aria-label="Open Chat">
-        <span class="launcher-text">Talk to ${this.escapeHtml(companyName)}</span>
         <div class="launcher-avatar-wrap">
           <div class="launcher-avatar">
-            ${this.getAvatarHtml(44)}
+            ${this.getAvatarHtml(42)}
           </div>
           <span class="online-badge"></span>
+        </div>
+        <div class="launcher-text-wrap">
+          <div class="launcher-headline">
+            <span class="launcher-title">${this.escapeHtml(assistantName || 'Colt AI')}</span>
+            <span class="launcher-pill-status">● Live</span>
+          </div>
+          <div class="launcher-sub">Order & Research Specialist</div>
         </div>
       </div>
 
@@ -182,7 +197,7 @@ export class UniversalCommerceWidget {
             <div class="banner-text-group">
               <span class="banner-greeting">Hi, I am</span>
               <span class="banner-assistant-name">${this.escapeHtml(assistantName)}</span>
-              <span class="banner-tagline">Your AI Commerce Partner</span>
+              <span class="banner-tagline">Research Concierge & Support</span>
             </div>
           </div>
           <div class="banner-controls">
@@ -200,7 +215,45 @@ export class UniversalCommerceWidget {
         <!-- Store Sub-Intro Banner -->
         <div class="store-sub-intro">
           <div class="store-title">Welcome to ${this.escapeHtml(companyName)}</div>
-          <div class="store-subtitle">Ask anything about products, pricing, stock, or tools</div>
+          <div class="store-subtitle">Ask anything about compounds, research, live orders, or cart</div>
+        </div>
+
+        <!-- Sticky In-Chat Cart Bar (Real-Time Synchronized) -->
+        <div class="inchat-cart-strip hidden" id="inchatCartStrip">
+          <div class="cart-strip-left" id="cartStripToggle">
+            <span class="cart-strip-icon">🛒</span>
+            <span class="cart-strip-count" id="cartStripCountText"><strong>0</strong> items</span>
+            <span class="cart-strip-total" id="cartStripTotalText">• $0.00</span>
+          </div>
+          <div class="cart-strip-actions">
+            <button class="cart-strip-manage-btn" id="cartStripManageBtn" type="button">Manage</button>
+            <a href="https://colbolt.hawksnfox.com/checkout/" target="_blank" class="cart-strip-checkout-btn">Checkout →</a>
+          </div>
+        </div>
+
+        <!-- Slide-over Cart Drawer / Quick Manager Modal -->
+        <div class="cart-drawer hidden" id="cartDrawer">
+          <div class="cart-drawer-header">
+            <div class="drawer-title-wrap">
+              <span class="drawer-icon">🛒</span>
+              <span class="drawer-title">Shopping Cart</span>
+              <span class="drawer-badge" id="drawerCartBadge">0</span>
+            </div>
+            <button class="cart-drawer-close-btn" id="closeCartDrawerBtn" type="button" aria-label="Close Cart">✕</button>
+          </div>
+          <div class="cart-drawer-items" id="cartDrawerItems">
+            <!-- Dynamically populated items -->
+          </div>
+          <div class="cart-drawer-footer">
+            <div class="drawer-subtotal-row">
+              <span>Estimated Subtotal:</span>
+              <span class="drawer-total-price" id="drawerTotalPrice">$0.00</span>
+            </div>
+            <div class="drawer-cta-row">
+              <button class="drawer-clear-btn" id="drawerClearCartBtn" type="button">Empty Cart</button>
+              <a href="https://colbolt.hawksnfox.com/checkout/" target="_blank" class="drawer-checkout-btn">Proceed to Checkout 💳</a>
+            </div>
+          </div>
         </div>
 
         <!-- Body / Message Thread -->
@@ -227,13 +280,17 @@ export class UniversalCommerceWidget {
 
         <!-- Action Popover Menu (Toggled by + button) -->
         <div class="action-menu hidden" id="actionMenu">
+          <button class="action-menu-item" data-action="manage_cart">
+            <svg viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></svg>
+            My Cart & Checkout
+          </button>
           <button class="action-menu-item" data-action="all_products">
             <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
             Browse All Products
           </button>
-          <button class="action-menu-item" data-action="tile_calculator">
+          <button class="action-menu-item" data-action="track_order">
             <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
-            Tile & Area Calculator
+            Track My Order
           </button>
           <button class="action-menu-item" data-action="shipping">
             <svg viewBox="0 0 24 24"><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
@@ -242,6 +299,8 @@ export class UniversalCommerceWidget {
           <button class="action-menu-item" data-action="clear_chat">
             <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
             Clear Conversation
+          </button>
+        </div>
           </button>
         </div>
 
@@ -303,7 +362,11 @@ export class UniversalCommerceWidget {
       this.isActionMenuOpen = false;
       actionMenu.classList.add('hidden');
 
-      if (action === 'all_products') {
+      if (action === 'manage_cart') {
+        this.openCartDrawer();
+      } else if (action === 'track_order') {
+        this.sendMessage('Track my order');
+      } else if (action === 'all_products') {
         this.sendMessage('Show me all products');
       } else if (action === 'tile_calculator') {
         this.renderTileCalculatorWidget();
@@ -311,6 +374,31 @@ export class UniversalCommerceWidget {
         this.sendMessage('What is your shipping policy?');
       } else if (action === 'clear_chat') {
         this.clearChat();
+      }
+    });
+
+    // In-Chat Cart Bar & Slide-over Drawer Event Listeners
+    const cartStripToggle = this.shadowRoot.getElementById('cartStripToggle');
+    const cartStripManageBtn = this.shadowRoot.getElementById('cartStripManageBtn');
+    const closeCartDrawerBtn = this.shadowRoot.getElementById('closeCartDrawerBtn');
+    const drawerClearCartBtn = this.shadowRoot.getElementById('drawerClearCartBtn');
+    const cartDrawerItems = this.shadowRoot.getElementById('cartDrawerItems');
+
+    cartStripToggle?.addEventListener('click', () => this.openCartDrawer());
+    cartStripManageBtn?.addEventListener('click', () => this.openCartDrawer());
+    closeCartDrawerBtn?.addEventListener('click', () => this.closeCartDrawer());
+    drawerClearCartBtn?.addEventListener('click', () => this.handleClearAllCart());
+
+    // Direct removal of products from inside the Cart Drawer UI
+    cartDrawerItems?.addEventListener('click', (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const removeBtn = target.classList.contains('drawer-item-remove-btn') ? target : target.closest('.drawer-item-remove-btn') as HTMLElement;
+      if (removeBtn) {
+        const pId = removeBtn.getAttribute('data-product-id');
+        const pTitle = removeBtn.getAttribute('data-product-title');
+        if (pId) {
+          this.handleRemoveFromCart(pId, pTitle || 'Item');
+        }
       }
     });
 
@@ -419,7 +507,8 @@ export class UniversalCommerceWidget {
         body: JSON.stringify({
           siteKey: this.siteKey,
           conversationId: this.conversationId,
-          message: text
+          message: text,
+          cartItems: this.cartItems
         })
       });
 
@@ -601,7 +690,14 @@ export class UniversalCommerceWidget {
   private clearChat(): void {
     const chatBody = this.shadowRoot.getElementById('chatBody');
     if (!chatBody) return;
+    this.cartItems = [];
     this.conversationId = `conv_${Date.now()}`;
+    fetch(`${this.apiUrl}/api/cart/clear`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Site-Key': this.siteKey },
+      body: JSON.stringify({ siteKey: this.siteKey, conversationId: this.conversationId })
+    }).catch(() => {});
+
     chatBody.innerHTML = `
       <div class="message-row assistant">
         <div class="message-avatar">
@@ -623,15 +719,49 @@ export class UniversalCommerceWidget {
   }
 
   private async handleAddToCart(buttonEl: HTMLElement, productId: string, quantity: number): Promise<void> {
+    if (buttonEl.getAttribute('data-loading') === 'true') return;
+    buttonEl.setAttribute('data-loading', 'true');
+
     const originalText = buttonEl.innerHTML;
     buttonEl.innerHTML = 'Adding...';
     buttonEl.style.opacity = '0.7';
+
+    const card = buttonEl.closest('.product-card');
+    const titleEl = card?.querySelector('.product-title');
+    const productTitle = titleEl?.textContent?.trim() || 'Selected Product';
+    const priceEl = card?.querySelector('.product-price');
+    const priceText = priceEl?.textContent?.replace(/[^0-9.]/g, '') || '0';
+    const priceNum = parseFloat(priceText) || 0;
 
     try {
       const result = await WooCommerceStorefrontBridge.executeCartAddition(productId, quantity);
       buttonEl.innerHTML = '✓ Added to Cart';
       buttonEl.classList.add('added');
       buttonEl.style.opacity = '1';
+
+      // Record in local session cart
+      const existing = this.cartItems.find(it => it.id === productId);
+      if (existing) {
+        existing.quantity += quantity;
+      } else {
+        this.cartItems.push({ id: productId, title: productTitle, price: priceNum, quantity });
+      }
+      this.updateCartUI();
+
+      // Notify backend cart endpoint
+      fetch(`${this.apiUrl}/api/cart/add`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Site-Key': this.siteKey
+        },
+        body: JSON.stringify({
+          siteKey: this.siteKey,
+          conversationId: this.conversationId,
+          productId,
+          quantity
+        })
+      }).catch(() => {});
 
       // Send confirmation toast in chat
       const chatBody = this.shadowRoot.getElementById('chatBody');
@@ -660,10 +790,156 @@ export class UniversalCommerceWidget {
       setTimeout(() => {
         buttonEl.innerHTML = originalText;
         buttonEl.classList.remove('added');
+        buttonEl.removeAttribute('data-loading');
       }, 3500);
     } catch (err) {
       buttonEl.innerHTML = 'Error';
+      buttonEl.removeAttribute('data-loading');
       setTimeout(() => { buttonEl.innerHTML = originalText; buttonEl.style.opacity = '1'; }, 2000);
+    }
+  }
+
+  public updateCartUI(): void {
+    const strip = this.shadowRoot.getElementById('inchatCartStrip');
+    const stripCountText = this.shadowRoot.getElementById('cartStripCountText');
+    const stripTotalText = this.shadowRoot.getElementById('cartStripTotalText');
+    const drawerBadge = this.shadowRoot.getElementById('drawerCartBadge');
+    const drawerTotalPrice = this.shadowRoot.getElementById('drawerTotalPrice');
+    const drawerItemsContainer = this.shadowRoot.getElementById('cartDrawerItems');
+
+    const totalQty = this.cartItems.reduce((acc, it) => acc + (it.quantity || 1), 0);
+    const totalPrice = this.cartItems.reduce((acc, it) => acc + ((it.price || 0) * (it.quantity || 1)), 0);
+
+    if (strip) {
+      if (totalQty > 0) {
+        strip.classList.remove('hidden');
+        if (stripCountText) stripCountText.innerHTML = `<strong>${totalQty}</strong> ${totalQty === 1 ? 'item' : 'items'}`;
+        if (stripTotalText) stripTotalText.textContent = `• $${totalPrice.toFixed(2)}`;
+      } else {
+        strip.classList.add('hidden');
+      }
+    }
+
+    if (drawerBadge) drawerBadge.textContent = String(totalQty);
+    if (drawerTotalPrice) drawerTotalPrice.textContent = `$${totalPrice.toFixed(2)}`;
+
+    if (drawerItemsContainer) {
+      if (this.cartItems.length === 0) {
+        drawerItemsContainer.innerHTML = `
+          <div class="cart-drawer-empty">
+            <div style="font-size:32px; margin-bottom:8px;">🛒</div>
+            <p style="font-weight:700; color:var(--text-main); font-size:14px;">Your cart is empty</p>
+            <p style="font-size:12px; margin-top:4px;">Add research compounds or Bacteriostatic Water to get started.</p>
+          </div>
+        `;
+      } else {
+        drawerItemsContainer.innerHTML = this.cartItems.map(item => `
+          <div class="cart-drawer-item">
+            <div class="drawer-item-info">
+              <div class="drawer-item-title" title="${this.escapeHtml(item.title)}">${this.escapeHtml(item.title)}</div>
+              <div class="drawer-item-price">$${((item.price || 0) * (item.quantity || 1)).toFixed(2)}</div>
+              <div class="drawer-item-qty">Quantity: <strong>${item.quantity || 1}</strong></div>
+            </div>
+            <button class="drawer-item-remove-btn" data-product-id="${this.escapeHtml(String(item.id))}" data-product-title="${this.escapeHtml(item.title)}" title="Remove from Cart" aria-label="Remove item">
+              <svg style="width:16px;height:16px;fill:currentColor" viewBox="0 0 24 24">
+                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+              </svg>
+            </button>
+          </div>
+        `).join('');
+      }
+    }
+  }
+
+  public openCartDrawer(): void {
+    const drawer = this.shadowRoot.getElementById('cartDrawer');
+    if (drawer) {
+      this.updateCartUI();
+      drawer.classList.remove('hidden');
+    }
+  }
+
+  public closeCartDrawer(): void {
+    const drawer = this.shadowRoot.getElementById('cartDrawer');
+    if (drawer) {
+      drawer.classList.add('hidden');
+    }
+  }
+
+  public async handleRemoveFromCart(productId: string, productTitle: string): Promise<void> {
+    const index = this.cartItems.findIndex(it => String(it.id) === String(productId) || it.title.toLowerCase().includes(productTitle.toLowerCase()));
+    if (index !== -1) {
+      this.cartItems.splice(index, 1);
+    }
+    this.updateCartUI();
+
+    // Call WordPress Storefront Bridge to remove from active WooCommerce session
+    WooCommerceStorefrontBridge.executeCartRemoval(productId).catch(() => {});
+
+    // Call backend API
+    fetch(`${this.apiUrl}/api/cart/remove`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Site-Key': this.siteKey },
+      body: JSON.stringify({
+        siteKey: this.siteKey,
+        conversationId: this.conversationId,
+        productId
+      })
+    }).catch(() => {});
+
+    // Append toast notice in chat
+    const chatBody = this.shadowRoot.getElementById('chatBody');
+    if (chatBody) {
+      const confirmRow = document.createElement('div');
+      confirmRow.className = 'message-row assistant';
+      confirmRow.innerHTML = `
+        <div class="message-avatar">${this.getAvatarHtml(34)}</div>
+        <div class="message-content-group">
+          <div class="message-bubble assistant" style="border-left: 3px solid #dc2626;">
+            <p>🗑️ <strong>${this.escapeHtml(productTitle)}</strong> has been removed from your shopping cart.</p>
+          </div>
+          <span class="message-timestamp">${this.getTimeString()}</span>
+        </div>
+      `;
+      chatBody.appendChild(confirmRow);
+      chatBody.scrollTop = chatBody.scrollHeight;
+    }
+  }
+
+  public async handleClearAllCart(): Promise<void> {
+    this.cartItems = [];
+    this.updateCartUI();
+
+    // Call WordPress Storefront Bridge
+    WooCommerceStorefrontBridge.clearStoreCart().catch(() => {});
+
+    // Call backend API
+    fetch(`${this.apiUrl}/api/cart/clear`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Site-Key': this.siteKey },
+      body: JSON.stringify({
+        siteKey: this.siteKey,
+        conversationId: this.conversationId
+      })
+    }).catch(() => {});
+
+    setTimeout(() => this.closeCartDrawer(), 300);
+
+    const chatBody = this.shadowRoot.getElementById('chatBody');
+    if (chatBody) {
+      const confirmRow = document.createElement('div');
+      confirmRow.className = 'message-row assistant';
+      confirmRow.innerHTML = `
+        <div class="message-avatar">${this.getAvatarHtml(34)}</div>
+        <div class="message-content-group">
+          <div class="message-bubble assistant" style="border-left: 3px solid #dc2626;">
+            <p>🗑️ Your shopping cart has been cleared.</p>
+          </div>
+          <span class="message-timestamp">${this.getTimeString()}</span>
+        </div>
+      `;
+      chatBody.appendChild(confirmRow);
+      chatBody.scrollTop = chatBody.scrollHeight;
     }
   }
 
