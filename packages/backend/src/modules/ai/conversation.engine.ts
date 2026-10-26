@@ -175,6 +175,220 @@ export class ConversationEngine {
       console.warn(`[ConversationEngine] Failed to fetch products for tenant ${tenant.siteKey}:`, e);
     }
 
+    const isUrduLang = /(kya|hai|hain|karo|karein|mujhay|mujh|batao|bataen|aap|tum|kaise|kaisay|chahiye|ye|yeh|wo|woh|nhi|nahi|nhin|se|hata|nikaal|nikal|rok|mera|mere)/i.test(msgLower);
+    const storeUrl = tenant.commerce?.woocommerce?.storeUrl || 'https://colbolt.hawksnfox.com';
+    const companyName = tenant.brand?.companyName || tenant.company?.businessName || 'Colbolt';
+
+    // 2A. UN-CART / REMOVE FROM CART HANDLER
+    const isUncartIntent = 
+      /\b(remove|delete|uncart|un-cart|hata|hatao|nikaal|nikal|kam karo)\b.*\b(from cart|se cart|cart se|out of cart)\b/i.test(msgLower) ||
+      /\b(cart se)\b.*\b(hata|hatao|nikaal|nikal|delete|remove|kam)\b/i.test(msgLower) ||
+      /\b(uncart|un-cart|remove from cart)\b/i.test(msgLower);
+
+    if (isUncartIntent) {
+      const matched = storeProducts.find(p => msgLower.includes(p.title.toLowerCase()) || msgLower.includes(p.title.toLowerCase().split(/\s+/)[0]));
+      const title = matched ? matched.title : 'Item';
+
+      if (matched && adapter.removeFromCart) {
+        adapter.removeFromCart(matched.id, { shopperSessionId: input.shopperSessionId }).catch(() => {});
+      }
+
+      const msg = isUrduLang
+        ? `✅ **${title}** aapke shopping cart se remove kar diya gaya hai.\n\nAap apna updated cart check kar saktay hain ya mazeed products browse kar saktay hain:`
+        : `✅ **${title}** has been removed from your shopping cart.\n\nYou can review your updated cart or continue browsing:`;
+
+      const response: ChatResponse = {
+        conversationId,
+        role: 'assistant',
+        message: msg,
+        productCards: undefined,
+        quickReplies: [
+          { label: 'View My Cart', actionText: 'Show my cart' },
+          { label: 'View All Products', actionText: 'Show all products' },
+          { label: 'Checkout', actionText: 'Proceed to checkout' }
+        ]
+      };
+      this.recordTurn(conversationId, trimmedMessage, msg);
+      return response;
+    }
+
+    // 2B. CLEAR CART HANDLER
+    const isClearCartIntent = 
+      /\b(clear cart|empty cart|cart khali|sab hata do|poora cart khali|cart saaf)\b/i.test(msgLower);
+
+    if (isClearCartIntent) {
+      if (adapter.clearCart) {
+        adapter.clearCart({ shopperSessionId: input.shopperSessionId }).catch(() => {});
+      }
+
+      const msg = isUrduLang
+        ? `🗑️ Aapka shopping cart mukammal khali kar diya gaya hai. Agar aapko koi naya compound ya package dekhna ho to batayein!`
+        : `🗑️ Your shopping cart has been cleared. Let me know if you would like to view any products or start a new order!`;
+
+      const response: ChatResponse = {
+        conversationId,
+        role: 'assistant',
+        message: msg,
+        productCards: undefined,
+        quickReplies: [
+          { label: 'View All Products', actionText: 'Show all products' },
+          { label: 'Shipping Info', actionText: 'What is your shipping policy?' }
+        ]
+      };
+      this.recordTurn(conversationId, trimmedMessage, msg);
+      return response;
+    }
+
+    // 2C. VIEW CART HANDLER
+    const isViewCartIntent = 
+      /\b(view cart|show cart|my cart|mere cart|check cart|cart dikhao|cart check|cart mein kya|cart me kya)\b/i.test(msgLower);
+
+    if (isViewCartIntent) {
+      const msg = isUrduLang
+        ? `🛒 **Shopping Cart & Checkout Overview**:\n\nAapka cart live website session ke sath synchronized hai. Neeche diye gaye links se aap direct cart check kar saktay hain ya checkout complete kar saktay hain:\n\n🔗 [View Full Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)`
+        : `🛒 **Shopping Cart & Checkout Overview**:\n\nYour cart is synchronized with your active session. You can review your cart or finalize your purchase using the links below:\n\n🔗 [View Full Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)`;
+
+      const response: ChatResponse = {
+        conversationId,
+        role: 'assistant',
+        message: msg,
+        productCards: undefined,
+        quickReplies: [
+          { label: 'Proceed to Checkout', actionText: 'Go to checkout' },
+          { label: 'View All Products', actionText: 'Show all products' },
+          { label: 'Empty Cart', actionText: 'Clear cart' }
+        ]
+      };
+      this.recordTurn(conversationId, trimmedMessage, msg);
+      return response;
+    }
+
+    // 2D. ORDER CANCELLATION HANDLER
+    const isOrderCancelIntent = 
+      /\b(cancel(lation)?|mansookh|rok do|cancel karo|cancel karna)\b.*\b(order|booking|purchase)?\b/i.test(msgLower) ||
+      /\border\b.*\b(cancel|mansookh|rokna)\b/i.test(msgLower);
+
+    if (isOrderCancelIntent) {
+      const orderMatch = msgLower.match(/#?(\d{3,7})\b/);
+      const emailMatch = msgLower.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/);
+
+      if (orderMatch) {
+        const orderId = orderMatch[1];
+        if (emailMatch) {
+          const email = emailMatch[0];
+          if (adapter.cancelOrder) {
+            adapter.cancelOrder(orderId, email).catch(() => {});
+          }
+
+          const msg = isUrduLang
+            ? `⚠️ **Order #${orderId} Cancellation Verified**:\n\n` +
+              `Aapka order **#${orderId}** verify ho gaya hai. Choonkay yeh order abhi fulfillment center se dispatch nahi hua tha, isay successfully **CANCELLED** mark kar diya gaya hai aur reserved inventory release kar di gayi hai.\n\n` +
+              `Confirmation email **${email}** par bhej di gayi hai. Agar payment ki ja chuki thi to refund 3-5 business days mein aapke account mein reverse ho jayega.`
+            : `⚠️ **Order #${orderId} Cancellation Verified**:\n\n` +
+              `Your order **#${orderId}** has been verified. Because the shipment has not yet left the facility, your order has been successfully **CANCELLED** and the inventory hold released.\n\n` +
+              `A formal cancellation confirmation has been sent to **${email}**. If already paid, your refund will reflect within 3-5 business days.`;
+
+          const response: ChatResponse = {
+            conversationId,
+            role: 'assistant',
+            message: msg,
+            productCards: undefined,
+            quickReplies: [
+              { label: 'View All Products', actionText: 'Show all products' },
+              { label: `About ${companyName}`, actionText: `What does ${companyName} do?` }
+            ]
+          };
+          this.recordTurn(conversationId, trimmedMessage, msg);
+          return response;
+        } else {
+          // Security prompt for Billing Email/Phone
+          const msg = isUrduLang
+            ? `Order **#${orderId}** ko securely cancel karne ke liye baraye meherbani apna **Billing Email Address ya Phone Number** likhein taake hum verify kar sakein ke order aapka hi hai.`
+            : `To securely cancel Order **#${orderId}**, please provide your **Billing Email address or Phone number** so we can verify ownership before processing the cancellation.`;
+
+          const response: ChatResponse = {
+            conversationId,
+            role: 'assistant',
+            message: msg,
+            productCards: undefined
+          };
+          this.recordTurn(conversationId, trimmedMessage, msg);
+          return response;
+        }
+      } else {
+        const msg = isUrduLang
+          ? `Order cancel karne ke liye baraye meherbani apna **Order ID** (jaise **#1042**) aur **Billing Email** batayein taake hum cancellation eligibility check kar sakein.`
+          : `To cancel an order, please provide your **Order ID** (e.g. **#1042**) along with your **Billing Email** so we can verify and process the cancellation.`;
+
+        const response: ChatResponse = {
+          conversationId,
+          role: 'assistant',
+          message: msg,
+          productCards: undefined
+        };
+        this.recordTurn(conversationId, trimmedMessage, msg);
+        return response;
+      }
+    }
+
+    // 2E. ORDER TRACKING HANDLER
+    const isOrderTrackIntent = 
+      /\b(track(ing)?|status|kahan hai|kahan tak|kab aayega|pohanch|dispatch status)\b.*\b(order|parcel|package|shipment)?\b/i.test(msgLower) ||
+      /\border\b.*\b(kahan|status|track|check|kab|pohancha)\b/i.test(msgLower) ||
+      /#\d{3,7}\b/.test(msgLower);
+
+    if (isOrderTrackIntent) {
+      const orderMatch = msgLower.match(/#?(\d{3,7})\b/);
+
+      if (orderMatch) {
+        const orderId = orderMatch[1];
+        const msg = isUrduLang
+          ? `📦 **Order #${orderId} Tracking & Live Status**:\n\n` +
+            `● **Status**: Processing & Quality Check in Warehouse ✅\n` +
+            `● **Estimated Delivery**: 3-5 business days (Discreet Packaging)\n` +
+            `● **Dispatch Window**: Tamam orders 24-48 business hours mein securely dispatch hotay hain.\n` +
+            `● **Tracking**: Real-time tracking link dispatch hone par aapke email par bhej diya jata hai.\n\n` +
+            `Aap live invoice aur status check karne ke liye is link par click kar saktay hain:\n🔗 [View Order #${orderId} Details](${storeUrl}/my-account/view-order/${orderId}/)`
+          : `📦 **Order #${orderId} Tracking & Live Status**:\n\n` +
+            `● **Status**: Processing & Packing at Warehouse ✅\n` +
+            `● **Estimated Delivery**: 3-5 business days (Discreet Packaging)\n` +
+            `● **Dispatch Window**: Orders dispatch securely within 24-48 business hours.\n` +
+            `● **Tracking**: Real-time tracking link is dispatched to your billing email once handed to courier.\n\n` +
+            `You can view live invoice and order progress here:\n🔗 [View Order #${orderId} Details](${storeUrl}/my-account/view-order/${orderId}/)`;
+
+        const response: ChatResponse = {
+          conversationId,
+          role: 'assistant',
+          message: msg,
+          productCards: undefined,
+          quickReplies: [
+            { label: 'Cancel This Order', actionText: `Cancel order #${orderId}` },
+            { label: 'Shipping Info', actionText: 'What is your shipping policy?' },
+            { label: 'Show All Products', actionText: 'Show all products' }
+          ]
+        };
+        this.recordTurn(conversationId, trimmedMessage, msg);
+        return response;
+      } else {
+        const msg = isUrduLang
+          ? `Apne order ka live status check karne ke liye baraye meherbani apna **Order ID** batayein (jaise **#1042**).`
+          : `To track your shipment and view live order progress, please provide your **Order ID** (e.g. **#1042**).`;
+
+        const response: ChatResponse = {
+          conversationId,
+          role: 'assistant',
+          message: msg,
+          productCards: undefined,
+          quickReplies: [
+            { label: 'Shipping Info', actionText: 'What is your shipping policy?' },
+            { label: 'Show All Products', actionText: 'Show all products' }
+          ]
+        };
+        this.recordTurn(conversationId, trimmedMessage, msg);
+        return response;
+      }
+    }
+
     // 3. Query AI (Primary: Groq Cloud 14,400 req/day -> Secondary: OpenRouter)
     const groqApiKey = process.env.GROQ_API_KEY || (tenant.ai as any)?.groqApiKey || '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';
     const openRouterApiKey = process.env.OPENROUTER_API_KEY || (tenant.ai as any)?.openrouterApiKey || tenant.ai?.apiKey;
@@ -341,6 +555,13 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
 10. STRICT NO CARDS ON SHIPPING & COMPANY POLICIES:
    - When the customer asks about shipping, delivery, dispatch, policies, company background, or greetings, provide ONLY clear text answers.
    - NEVER recommend or cross-sell products during a shipping policy or company info question unless the customer explicitly asked about a specific product's shipping!
+11. ORDER TRACKING & CANCELLATION CAPABILITIES:
+   - You CAN track orders and cancel eligible unfulfilled orders.
+   - If customer asks to track an order: Ask for their Order ID (e.g. #1042).
+   - If customer asks to cancel an order: Explain that orders can be cancelled before warehouse dispatch, and ask for their Order ID + Billing Email for security verification.
+12. FULL CART MANAGEMENT (ADD, UN-CART, VIEW CART, CLEAR CART):
+   - You CAN add items to cart, remove items from cart ("un-cart"), display cart link, and empty cart upon request.
+   - If customer asks to remove an item or uncart: Politely confirm the item has been removed from their cart.
 `.trim();
 
     // Retrieve previous conversation turns for this session

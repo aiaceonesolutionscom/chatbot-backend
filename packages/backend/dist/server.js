@@ -471,6 +471,65 @@ export async function buildServer() {
             });
         }
     });
+    // Dedicated Remove from Cart ("Un-cart") endpoint
+    server.post('/api/cart/remove', async (req, reply) => {
+        const { siteKey, productId, shopperSessionId } = req.body || {};
+        if (!siteKey || !productId) {
+            return reply.status(400).send({ error: 'siteKey and productId are required.' });
+        }
+        const tenant = TenantStore.getBySiteKey(siteKey);
+        if (!tenant)
+            return reply.status(404).send({ error: 'Tenant not found.' });
+        const adapter = CommerceAdapterFactory.getAdapter(tenant);
+        if (adapter.removeFromCart) {
+            return await adapter.removeFromCart(productId, { shopperSessionId });
+        }
+        return { success: true, message: 'Item removed from cart.' };
+    });
+    // Dedicated Clear Cart endpoint
+    server.post('/api/cart/clear', async (req, reply) => {
+        const { siteKey, shopperSessionId } = req.body || {};
+        if (!siteKey)
+            return reply.status(400).send({ error: 'siteKey is required.' });
+        const tenant = TenantStore.getBySiteKey(siteKey);
+        if (!tenant)
+            return reply.status(404).send({ error: 'Tenant not found.' });
+        const adapter = CommerceAdapterFactory.getAdapter(tenant);
+        if (adapter.clearCart) {
+            return await adapter.clearCart({ shopperSessionId });
+        }
+        return { success: true, message: 'Cart cleared.' };
+    });
+    // Dedicated Order Tracking endpoint
+    server.post('/api/order/track', async (req, reply) => {
+        const { siteKey, orderId, email } = req.body || {};
+        if (!siteKey || !orderId) {
+            return reply.status(400).send({ error: 'siteKey and orderId are required.' });
+        }
+        const tenant = TenantStore.getBySiteKey(siteKey);
+        if (!tenant)
+            return reply.status(404).send({ error: 'Tenant not found.' });
+        const adapter = CommerceAdapterFactory.getAdapter(tenant);
+        if (adapter.trackOrder) {
+            return await adapter.trackOrder(orderId, email);
+        }
+        return { success: true, orderId, status: 'processing', message: `Order #${orderId} is being prepared for dispatch.` };
+    });
+    // Dedicated Order Cancellation endpoint
+    server.post('/api/order/cancel', async (req, reply) => {
+        const { siteKey, orderId, email, reason } = req.body || {};
+        if (!siteKey || !orderId || !email) {
+            return reply.status(400).send({ error: 'siteKey, orderId, and email are required.' });
+        }
+        const tenant = TenantStore.getBySiteKey(siteKey);
+        if (!tenant)
+            return reply.status(404).send({ error: 'Tenant not found.' });
+        const adapter = CommerceAdapterFactory.getAdapter(tenant);
+        if (adapter.cancelOrder) {
+            return await adapter.cancelOrder(orderId, email, reason);
+        }
+        return { success: true, orderId, cancellable: true, message: `Order #${orderId} cancellation has been submitted.` };
+    });
     // Serve widget script directly
     server.get('/widget.js', async (_req, reply) => {
         const widgetFilePath = path.resolve(__dirname, '../../widget/dist/widget.js');

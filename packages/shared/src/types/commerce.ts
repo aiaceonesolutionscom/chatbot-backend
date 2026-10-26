@@ -137,6 +137,7 @@ export interface CartOperationResult {
   message: string;
   cart?: CartState;
   addedItem?: CartItem;
+  removedItemKey?: string;
   clientBridgePayload?: {
     action: 'woocommerce_store_api' | 'woocommerce_ajax' | 'shopify_cart' | 'custom_redirect';
     endpoint: string;
@@ -146,4 +147,29 @@ export interface CartOperationResult {
     nonceName?: string;
     domEventsToTrigger?: string[];
   };
+}
+
+export interface OrderTrackingResult {
+  success: boolean;
+  orderId: string;
+  status: string; // 'pending' | 'processing' | 'on-hold' | 'completed' | 'cancelled' | 'refunded' | 'failed'
+  statusLabel: string;
+  dateCreated?: string;
+  total?: string;
+  currency?: string;
+  items?: Array<{ name: string; quantity: number; subtotal?: string }>;
+  trackingNumber?: string;
+  trackingUrl?: string;
+  carrier?: string;
+  shippingAddress?: string;
+  message: string;
+}
+
+export interface OrderCancelResult {
+  success: boolean;
+  orderId: string;
+  previousStatus?: string;
+  newStatus?: string;
+  cancellable: boolean;
+  message: string;
 }

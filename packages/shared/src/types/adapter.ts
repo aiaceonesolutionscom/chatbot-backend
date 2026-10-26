@@ -10,7 +10,9 @@ import {
   PriceQuote, 
   StockStatus, 
   CartState, 
-  CartOperationResult 
+  CartOperationResult,
+  OrderTrackingResult,
+  OrderCancelResult
 } from './commerce.js';
 
 export type CommerceCapability = 
@@ -21,7 +23,12 @@ export type CommerceCapability =
   | 'inventory_check'
   | 'server_cart_read'
   | 'server_cart_write'
-  | 'storefront_cart_bridge';
+  | 'storefront_cart_bridge'
+  | 'remove_from_cart'
+  | 'update_cart'
+  | 'clear_cart'
+  | 'track_order'
+  | 'cancel_order';
 
 export interface CartContext {
   shopperSessionId?: string;
@@ -79,4 +86,43 @@ export interface ICommerceAdapter {
     quantity: number, 
     context: CartContext
   ): Promise<CartOperationResult>;
+
+  /**
+   * Remove a product or variant from active cart ("un-cart").
+   */
+  removeFromCart?(
+    itemKeyOrProductId: string, 
+    context: CartContext
+  ): Promise<CartOperationResult>;
+
+  /**
+   * Update quantity of a cart line item.
+   */
+  updateCartQuantity?(
+    itemKeyOrProductId: string, 
+    quantity: number, 
+    context: CartContext
+  ): Promise<CartOperationResult>;
+
+  /**
+   * Clear all items from active cart.
+   */
+  clearCart?(context: CartContext): Promise<CartOperationResult>;
+
+  /**
+   * Track order by Order ID and optional verification email/phone.
+   */
+  trackOrder?(
+    orderId: string, 
+    emailOrPhone?: string
+  ): Promise<OrderTrackingResult>;
+
+  /**
+   * Cancel an order if it is in a cancellable state.
+   */
+  cancelOrder?(
+    orderId: string, 
+    emailOrPhone: string, 
+    reason?: string
+  ): Promise<OrderCancelResult>;
 }
