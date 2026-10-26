@@ -204,6 +204,7 @@ export function getWidgetStyles(primaryColor: string = '#16408a', position: 'bot
       border: 1px solid rgba(22, 64, 138, 0.15);
       transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.22s;
       transform-origin: ${isRight ? 'bottom right' : 'bottom left'};
+      z-index: 999999;
     }
 
     .chat-window:not(.hidden) {
@@ -219,6 +220,7 @@ export function getWidgetStyles(primaryColor: string = '#16408a', position: 'bot
 
     /* Branded Banner Header (Colbolt Uomo Theme Style Gradient) */
     .chat-header-banner {
+      flex-shrink: 0;
       background: linear-gradient(135deg, #0d2958 0%, #16408a 60%, #1f64c6 100%);
       padding: 16px 18px;
       display: flex;
@@ -318,6 +320,7 @@ export function getWidgetStyles(primaryColor: string = '#16408a', position: 'bot
 
     /* Store Introduction Subheader */
     .store-sub-intro {
+      flex-shrink: 0;
       padding: 14px 20px 8px;
       background: #ffffff;
     }
@@ -337,7 +340,9 @@ export function getWidgetStyles(primaryColor: string = '#16408a', position: 'bot
 
     /* Message Thread Area */
     .chat-body {
-      flex: 1;
+      flex: 1 1 0%;
+      min-height: 0;
+      max-height: 100%;
       padding: 16px 18px;
       overflow-y: auto;
       display: flex;
@@ -345,6 +350,7 @@ export function getWidgetStyles(primaryColor: string = '#16408a', position: 'bot
       gap: 14px;
       background: #ffffff;
       scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
     }
 
     .message-row {
@@ -549,6 +555,7 @@ export function getWidgetStyles(primaryColor: string = '#16408a', position: 'bot
 
     /* Sticky In-Chat Cart Bar */
     .inchat-cart-strip {
+      flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -954,6 +961,7 @@ export function getWidgetStyles(primaryColor: string = '#16408a', position: 'bot
 
     /* Modern Bottom Input Bar (YANA Style with + button) */
     .chat-footer {
+      flex-shrink: 0;
       padding: 12px 16px;
       background: #ffffff;
       border-top: 1px solid var(--border-color);

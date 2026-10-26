@@ -63,6 +63,16 @@ export class ConversationEngine {
     this.sessionCarts.set(conversationId, list);
   }
 
+  public static setSessionCartQuantity(conversationId: string, itemKeyOrTitle: string, quantity: number): void {
+    const list = this.sessionCarts.get(conversationId) || [];
+    const term = itemKeyOrTitle.toLowerCase().trim();
+    const existing = list.find(x => x.id === term || x.title.toLowerCase().includes(term));
+    if (existing) {
+      existing.quantity = quantity;
+    }
+    this.sessionCarts.set(conversationId, list);
+  }
+
   public static removeFromSessionCart(conversationId: string, itemKeyOrTitle: string): SessionCartItem | undefined {
     const list = this.sessionCarts.get(conversationId) || [];
     const term = itemKeyOrTitle.toLowerCase().trim();
@@ -235,6 +245,11 @@ export class ConversationEngine {
     const storeUrl = tenant.commerce?.woocommerce?.storeUrl || 'https://colbolt.hawksnfox.com';
     const companyName = tenant.brand?.companyName || tenant.company?.businessName || 'Colbolt';
 
+    // Synchronize incoming widget client cart state if provided
+    if (Array.isArray(input.cartItems) && input.cartItems.length > 0) {
+      ConversationEngine.sessionCarts.set(conversationId, [...input.cartItems]);
+    }
+
     // 2A. UN-CART / REMOVE FROM CART HANDLER
     // Matches: "tirz hata doo", "tirz hata do", "remove tirz", "water nikal do", "delete tirz", "cart se tirz hata do", "hata do", etc.
     const removeKeywords = /\b(remove|delete|uncart|un-cart|hata|hatao|nikaal|nikal|nikalo|drop|kam karo|minus)\b/i;
@@ -318,6 +333,11 @@ export class ConversationEngine {
         role: 'assistant',
         message: msg,
         productCards: undefined, // NEVER attach product cards when uncarting
+        cartAction: {
+          type: 'remove',
+          productId: targetId,
+          title
+        },
         quickReplies: [
           { label: 'View My Cart', actionText: 'Show my cart' },
           { label: 'View All Products', actionText: 'Show all products' },
@@ -326,6 +346,157 @@ export class ConversationEngine {
       };
       this.recordTurn(conversationId, trimmedMessage, msg);
       return response;
+    }
+
+    // 2A2. UPDATE QUANTITY / INCREASE QUANTITY HANDLER
+    // Matches: "quantity barha do", "quantity 2 kar do", "2 kardo", "make it 3", "update quantity to 2", "double karo", "quantity barhao", "quantity barhani hai"
+    const isQtyKeyword = /\b(quantity|qty|miqdaar|taadad|pieces?|vials?)\b/i.test(msgLower);
+    const isIncreaseWord = /\b(barha|barhao|barhani|increase|double|zyada|ek aur|add more|plus)\b/i.test(msgLower);
+    const isUpdateWord = /\b(update|change|kardo|kar do|karna|set|make)\b/i.test(msgLower);
+    const qtyNumMatch = msgLower.match(/\b([1-9]|10)\b/);
+    const isQuantityIntent = (isQtyKeyword && (qtyNumMatch || isIncreaseWord || isUpdateWord)) ||
+                             (isIncreaseWord && (isCartWord || matchedStoreProduct || /\b(product|item|yeh|ye|woh|wo)\b/i.test(msgLower)));
+
+    if (isQuantityIntent) {
+      const sessionItems = ConversationEngine.getSessionCart(conversationId);
+      let targetItem = sessionItems.find(it => {
+        const titleLower = it.title.toLowerCase();
+        const firstWord = titleLower.split(/\s+/)[0];
+        return msgLower.includes(titleLower) || msgLower.includes(firstWord);
+      });
+
+      if (!targetItem && sessionItems.length > 0) {
+        targetItem = sessionItems[sessionItems.length - 1];
+      }
+
+      if (targetItem) {
+        let newQty = targetItem.quantity + 1;
+        if (qtyNumMatch) {
+          newQty = parseInt(qtyNumMatch[1], 10);
+        } else if (/\bdouble\b/i.test(msgLower)) {
+          newQty = targetItem.quantity * 2;
+        }
+
+        targetItem.quantity = newQty;
+        ConversationEngine.setSessionCartQuantity(conversationId, targetItem.id, newQty);
+
+        if (adapter.addToCart) {
+          adapter.addToCart(targetItem.id, undefined, newQty, { shopperSessionId: input.shopperSessionId }).catch(() => {});
+        }
+
+        const subtotal = sessionItems.reduce((acc, it) => acc + (it.price * it.quantity), 0);
+        const msg = isUrduLang
+          ? `✅ **${targetItem.title}** ki quantity kamyabi se update kar ke **${newQty}x** kar di gayi hai!\n\n` +
+            `💵 **Updated Total**: $${subtotal.toFixed(2)}\n\n` +
+            `🔗 [View Full Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)`
+          : `✅ The quantity for **${targetItem.title}** has been successfully updated to **${newQty}x**!\n\n` +
+            `💵 **Updated Total**: $${subtotal.toFixed(2)}\n\n` +
+            `🔗 [View Full Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)`;
+
+        const response: ChatResponse = {
+          conversationId,
+          role: 'assistant',
+          message: msg,
+          productCards: undefined,
+          cartAction: {
+            type: 'update',
+            item: {
+              id: targetItem.id,
+              title: targetItem.title,
+              price: targetItem.price,
+              quantity: newQty
+            }
+          },
+          quickReplies: [
+            { label: 'View Full Cart', actionText: 'Show my cart' },
+            { label: 'Proceed to Checkout', actionText: 'Proceed to checkout' },
+            { label: 'Show All Products', actionText: 'Show all products' }
+          ]
+        };
+        this.recordTurn(conversationId, trimmedMessage, msg);
+        return response;
+      }
+    }
+
+    // 2A3. ADD TO CART VIA TEXT HANDLER
+    // Matches: "tirz 10mg add karo", "water add kardo", "add bacteriostatic water", "add semaglutide 10mg", "cart mai daal do", "buy tirz 10mg"
+    const addKeywords = /\b(add|daal|daalo|shamil|order karo|buy|khareedo|khareedna|mangwa do)\b/i;
+    const isBudgetAsk = /\b(budget|\$|dollar|sasta|chhota|kam price|under)\b/i.test(msgLower);
+    const isExplicitAddIntent = (addKeywords.test(msgLower) && !isBudgetAsk && (isCartWord || !!matchedStoreProduct)) ||
+                               (/\badd\s+(to\s+cart|it|this)\b/i.test(msgLower) && !isBudgetAsk);
+
+    if (isExplicitAddIntent && (matchedStoreProduct || ConversationEngine.getSessionCart(conversationId).length === 0)) {
+      // Find candidate product
+      let productToAdd = matchedStoreProduct;
+      if (!productToAdd) {
+        // Check if user specified a compound
+        if (/\bwater\b/i.test(msgLower)) {
+          productToAdd = storeProducts.find(p => p.title.toLowerCase().includes('water'));
+        } else if (/\btirz\b/i.test(msgLower)) {
+          // Check dosage
+          if (/60\s*mg/i.test(msgLower)) productToAdd = storeProducts.find(p => p.title.includes('60mg'));
+          else if (/30\s*mg/i.test(msgLower)) productToAdd = storeProducts.find(p => p.title.includes('30mg'));
+          else productToAdd = storeProducts.find(p => p.title.includes('10mg'));
+        } else if (/\bsema/i.test(msgLower)) {
+          if (/10\s*mg/i.test(msgLower)) productToAdd = storeProducts.find(p => p.title.includes('10mg') && p.title.toLowerCase().includes('sema'));
+          else productToAdd = storeProducts.find(p => p.title.toLowerCase().includes('sema'));
+        } else if (/\breta/i.test(msgLower)) {
+          productToAdd = storeProducts.find(p => p.title.toLowerCase().includes('reta'));
+        }
+      }
+
+      if (productToAdd) {
+        const qtyMatch = msgLower.match(/\b([1-9]|10)\s*(x|pieces?|vials?|bottles?)?\b/i);
+        const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
+
+        const cartItem: SessionCartItem = {
+          id: productToAdd.id,
+          title: productToAdd.title,
+          price: productToAdd.price.regular,
+          quantity: qty
+        };
+
+        ConversationEngine.addToSessionCart(conversationId, cartItem);
+        if (adapter.addToCart) {
+          adapter.addToCart(productToAdd.id, undefined, qty, { shopperSessionId: input.shopperSessionId }).catch(() => {});
+        }
+
+        const sessionItems = ConversationEngine.getSessionCart(conversationId);
+        const subtotal = sessionItems.reduce((acc, it) => acc + (it.price * it.quantity), 0);
+
+        const msg = isUrduLang
+          ? `✅ **${productToAdd.title}** (${qty}x) aapke shopping cart mein kamyabi se **ADD** kar diya gaya hai!\n\n` +
+            `💵 **Estimated Subtotal**: $${subtotal.toFixed(2)}\n\n` +
+            `Aap cart review kar saktay hain ya seedha checkout par ja saktay hain:\n` +
+            `🔗 [View Full Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)`
+          : `✅ **${productToAdd.title}** (${qty}x) has been successfully **ADDED** to your cart!\n\n` +
+            `💵 **Estimated Subtotal**: $${subtotal.toFixed(2)}\n\n` +
+            `You can review your order or proceed directly to checkout:\n` +
+            `🔗 [View Full Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)`;
+
+        const response: ChatResponse = {
+          conversationId,
+          role: 'assistant',
+          message: msg,
+          productCards: [productToAdd],
+          cartAction: {
+            type: 'add',
+            item: {
+              id: productToAdd.id,
+              title: productToAdd.title,
+              price: productToAdd.price.regular,
+              quantity: qty
+            }
+          },
+          quickReplies: [
+            { label: 'Proceed to Checkout', actionText: 'Proceed to checkout' },
+            { label: 'View Full Cart', actionText: 'Show my cart' },
+            { label: 'Empty Cart', actionText: 'Clear cart' }
+          ]
+        };
+        this.recordTurn(conversationId, trimmedMessage, msg);
+        return response;
+      }
     }
 
     // 2B. CLEAR CART HANDLER
@@ -347,6 +518,9 @@ export class ConversationEngine {
         role: 'assistant',
         message: msg,
         productCards: undefined,
+        cartAction: {
+          type: 'clear'
+        },
         quickReplies: [
           { label: 'View All Products', actionText: 'Show all products' },
           { label: 'Shipping Info', actionText: 'What is your shipping policy?' }

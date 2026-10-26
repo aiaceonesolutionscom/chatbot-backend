@@ -301,8 +301,6 @@ export class UniversalCommerceWidget {
             Clear Conversation
           </button>
         </div>
-          </button>
-        </div>
 
         <!-- Modern Bottom Input Bar (YANA Style with + button) -->
         <div class="chat-footer">
@@ -533,6 +531,44 @@ export class UniversalCommerceWidget {
   private renderBotResponse(data: any): void {
     const chatBody = this.shadowRoot.getElementById('chatBody');
     if (!chatBody) return;
+
+    // Handle bidirectional real-time Cart Actions triggered by conversational AI
+    if (data.cartAction) {
+      const action = data.cartAction;
+      if (action.type === 'remove') {
+        WooCommerceStorefrontBridge.executeCartRemoval(action.productId || action.title).catch(() => {});
+        this.cartItems = this.cartItems.filter(it => 
+          it.id !== String(action.productId) && 
+          (!action.title || !it.title.toLowerCase().includes(String(action.title).toLowerCase()))
+        );
+        this.updateCartUI();
+      } else if (action.type === 'add' && action.item) {
+        WooCommerceStorefrontBridge.executeCartAddition(action.item.id, action.item.quantity || 1).catch(() => {});
+        const exist = this.cartItems.find(it => it.id === String(action.item.id));
+        if (exist) {
+          exist.quantity += (action.item.quantity || 1);
+        } else {
+          this.cartItems.push({
+            id: String(action.item.id),
+            title: action.item.title,
+            price: Number(action.item.price || 0),
+            quantity: action.item.quantity || 1
+          });
+        }
+        this.updateCartUI();
+      } else if (action.type === 'update' && action.item) {
+        WooCommerceStorefrontBridge.executeCartUpdate(action.item.id, action.item.quantity).catch(() => {});
+        const exist = this.cartItems.find(it => it.id === String(action.item.id));
+        if (exist) {
+          exist.quantity = action.item.quantity;
+        }
+        this.updateCartUI();
+      } else if (action.type === 'clear') {
+        WooCommerceStorefrontBridge.clearStoreCart().catch(() => {});
+        this.cartItems = [];
+        this.updateCartUI();
+      }
+    }
 
     const botRow = document.createElement('div');
     botRow.className = 'message-row assistant';

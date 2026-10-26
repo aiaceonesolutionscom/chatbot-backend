@@ -22,7 +22,12 @@ export interface ChatResponse {
     role: 'assistant';
     productCards?: NormalizedProduct[];
     quickReplies?: QuickReplyOption[];
-    cartAction?: CartOperationResult;
+    cartAction?: CartOperationResult | {
+        type: string;
+        productId?: string;
+        item?: any;
+        title?: string;
+    };
     toolExecuted?: {
         toolName: string;
         params: Record<string, unknown>;

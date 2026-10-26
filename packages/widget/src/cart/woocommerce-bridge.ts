@@ -199,6 +199,62 @@ export class WooCommerceStorefrontBridge {
   }
 
   /**
+   * Updates quantity of a specific item in WooCommerce session cart
+   */
+  static async executeCartUpdate(itemKeyOrProductId: string | number, quantity: number): Promise<CartBridgeResult> {
+    if (quantity <= 0) {
+      return this.executeCartRemoval(itemKeyOrProductId);
+    }
+
+    if (this.isWpStorefront()) {
+      try {
+        const cartRes = await fetch(`${window.location.origin}/wp-json/wc/store/v1/cart`, {
+          method: 'GET',
+          headers: this.getHeaders(),
+          credentials: 'include'
+        });
+
+        if (cartRes.ok) {
+          const cartData = await cartRes.json();
+          const targetItem = (cartData.items || []).find((it: any) => 
+            it.key === String(itemKeyOrProductId) || 
+            String(it.id) === String(itemKeyOrProductId) ||
+            it.name.toLowerCase().includes(String(itemKeyOrProductId).toLowerCase())
+          );
+
+          const itemKey = targetItem ? targetItem.key : String(itemKeyOrProductId);
+
+          const updateRes = await fetch(`${window.location.origin}/wp-json/wc/store/v1/cart/update-item`, {
+            method: 'POST',
+            headers: this.getHeaders(),
+            credentials: 'include',
+            body: JSON.stringify({ key: itemKey, quantity: Number(quantity) })
+          });
+
+          if (updateRes.ok) {
+            const updatedCart = await updateRes.json();
+            this.triggerWooCommerceEvents(updatedCart, 'added_to_cart');
+            return {
+              success: true,
+              message: 'Cart updated successfully!',
+              cartCount: updatedCart?.items_count,
+              cartData: updatedCart
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('[WooCommerceBridge] Store API update-item error:', e);
+      }
+    }
+
+    this.triggerWooCommerceEvents({ items_count: quantity }, 'added_to_cart');
+    return {
+      success: true,
+      message: 'Cart quantity updated.'
+    };
+  }
+
+  /**
    * Clears all items in WooCommerce session cart
    */
   static async clearStoreCart(): Promise<void> {

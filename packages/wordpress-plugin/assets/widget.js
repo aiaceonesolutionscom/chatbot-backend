@@ -1,4 +1,4 @@
-var I=Object.defineProperty;var T=(x,u,m)=>u in x?I(x,u,{enumerable:!0,configurable:!0,writable:!0,value:m}):x[u]=m;var f=(x,u,m)=>T(x,typeof u!="symbol"?u+"":u,m);(function(x){"use strict";function u(k="#16408a",t="bottom-right"){const e=t==="bottom-right";return`
+var B=Object.defineProperty;var T=(x,m,g)=>m in x?B(x,m,{enumerable:!0,configurable:!0,writable:!0,value:g}):x[m]=g;var u=(x,m,g)=>T(x,typeof m!="symbol"?m+"":m,g);(function(x){"use strict";function m(k="#16408a",t="bottom-right"){const e=t==="bottom-right";return`
     :host {
       --primary: ${k};
       --primary-hover: #12336e;
@@ -195,6 +195,7 @@ var I=Object.defineProperty;var T=(x,u,m)=>u in x?I(x,u,{enumerable:!0,configura
       border: 1px solid rgba(22, 64, 138, 0.15);
       transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.22s;
       transform-origin: ${e?"bottom right":"bottom left"};
+      z-index: 999999;
     }
 
     .chat-window:not(.hidden) {
@@ -210,6 +211,7 @@ var I=Object.defineProperty;var T=(x,u,m)=>u in x?I(x,u,{enumerable:!0,configura
 
     /* Branded Banner Header (Colbolt Uomo Theme Style Gradient) */
     .chat-header-banner {
+      flex-shrink: 0;
       background: linear-gradient(135deg, #0d2958 0%, #16408a 60%, #1f64c6 100%);
       padding: 16px 18px;
       display: flex;
@@ -309,6 +311,7 @@ var I=Object.defineProperty;var T=(x,u,m)=>u in x?I(x,u,{enumerable:!0,configura
 
     /* Store Introduction Subheader */
     .store-sub-intro {
+      flex-shrink: 0;
       padding: 14px 20px 8px;
       background: #ffffff;
     }
@@ -328,7 +331,9 @@ var I=Object.defineProperty;var T=(x,u,m)=>u in x?I(x,u,{enumerable:!0,configura
 
     /* Message Thread Area */
     .chat-body {
-      flex: 1;
+      flex: 1 1 0%;
+      min-height: 0;
+      max-height: 100%;
       padding: 16px 18px;
       overflow-y: auto;
       display: flex;
@@ -336,6 +341,7 @@ var I=Object.defineProperty;var T=(x,u,m)=>u in x?I(x,u,{enumerable:!0,configura
       gap: 14px;
       background: #ffffff;
       scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
     }
 
     .message-row {
@@ -540,6 +546,7 @@ var I=Object.defineProperty;var T=(x,u,m)=>u in x?I(x,u,{enumerable:!0,configura
 
     /* Sticky In-Chat Cart Bar */
     .inchat-cart-strip {
+      flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -945,6 +952,7 @@ var I=Object.defineProperty;var T=(x,u,m)=>u in x?I(x,u,{enumerable:!0,configura
 
     /* Modern Bottom Input Bar (YANA Style with + button) */
     .chat-footer {
+      flex-shrink: 0;
       padding: 12px 16px;
       background: #ffffff;
       border-top: 1px solid var(--border-color);
@@ -1174,11 +1182,11 @@ var I=Object.defineProperty;var T=(x,u,m)=>u in x?I(x,u,{enumerable:!0,configura
         border-radius: 0;
       }
     }
-  `}class m{static isWpStorefront(){return typeof window<"u"&&(window.location.hostname.includes("colbolt.hawksnfox.com")||!!window.wc_store_api_nonce||!!window.wc_add_to_cart_params||!!window.woocommerce_params)}static getHeaders(){var e,i;const t={"Content-Type":"application/json",Accept:"application/json"};if(typeof window<"u"){const a=window.wc_store_api_nonce||((e=window.UniversalChatbotConfig)==null?void 0:e.nonce)||((i=document.querySelector('meta[name="wc-store-api-nonce"]'))==null?void 0:i.content);a&&(t.Nonce=a)}return t}static async fetchLiveCart(){if(!this.isWpStorefront())return null;try{const t=await fetch(`${window.location.origin}/wp-json/wc/store/v1/cart`,{method:"GET",headers:this.getHeaders(),credentials:"include"});if(t.ok)return((await t.json()).items||[]).map(i=>{var a,r,s;return{key:i.key,id:String(i.id),title:i.name,quantity:i.quantity,price:(a=i.prices)!=null&&a.price?Number(i.prices.price)/Math.pow(10,i.prices.currency_minor_unit||2):0,image:((s=(r=i.images)==null?void 0:r[0])==null?void 0:s.src)||""}})}catch(t){console.warn("[WooCommerceBridge] fetchLiveCart error:",t)}return null}static async executeCartAddition(t,e=1,i){if(this.isWpStorefront()){try{const a=i||`${window.location.origin}/wp-json/wc/store/v1/cart/add-item`,r=await fetch(a,{method:"POST",headers:this.getHeaders(),credentials:"include",body:JSON.stringify({id:Number(t),quantity:e})});if(r.ok){const s=await r.json();return this.triggerWooCommerceEvents(s,"added_to_cart"),{success:!0,message:"Added to cart!",cartCount:s==null?void 0:s.items_count,cartData:s}}}catch(a){console.warn("[WooCommerceBridge] Direct Store API call failed, trying wc-ajax fallback:",a)}try{const a=new FormData;a.append("product_id",String(t)),a.append("quantity",String(e));const r=await fetch(`${window.location.origin}/?wc-ajax=add_to_cart`,{method:"POST",credentials:"include",body:a});if(r.ok){const s=await r.json().catch(()=>({}));return this.triggerWooCommerceEvents(s,"added_to_cart"),{success:!0,message:"Added to cart!",cartData:s}}}catch(a){console.error("[WooCommerceBridge] wc-ajax fallback error:",a)}}return this.triggerWooCommerceEvents({items_count:1},"added_to_cart"),{success:!0,message:"Item added to your shopping cart!"}}static async executeCartRemoval(t){if(this.isWpStorefront()){try{const e=await fetch(`${window.location.origin}/wp-json/wc/store/v1/cart`,{method:"GET",headers:this.getHeaders(),credentials:"include"});if(e.ok){const a=((await e.json()).items||[]).find(o=>o.key===String(t)||String(o.id)===String(t)||o.name.toLowerCase().includes(String(t).toLowerCase())),r=a?a.key:String(t),s=await fetch(`${window.location.origin}/wp-json/wc/store/v1/cart/remove-item`,{method:"POST",headers:this.getHeaders(),credentials:"include",body:JSON.stringify({key:r})});if(s.ok){const o=await s.json();return this.triggerWooCommerceEvents(o,"removed_from_cart"),{success:!0,message:"Item removed from cart!",cartCount:o==null?void 0:o.items_count,cartData:o}}}}catch(e){console.warn("[WooCommerceBridge] Store API removal failed, trying fallback:",e)}try{const e=new FormData;e.append("cart_item_key",String(t)),await fetch(`${window.location.origin}/?wc-ajax=remove_from_cart`,{method:"POST",credentials:"include",body:e})}catch{}}return this.triggerWooCommerceEvents({items_count:0},"removed_from_cart"),{success:!0,message:"Item removed from cart."}}static async clearStoreCart(){if(this.isWpStorefront())try{const t=await this.fetchLiveCart();if(t&&t.length>0)for(const e of t)await this.executeCartRemoval(e.key)}catch(t){console.warn("[WooCommerceBridge] clearStoreCart error:",t)}}static triggerWooCommerceEvents(t,e="added_to_cart"){if(typeof window>"u")return;const i=window;if(i.jQuery)try{i.jQuery(document.body).trigger("wc_fragment_refresh"),i.jQuery(document.body).trigger(e,[t==null?void 0:t.fragments,t==null?void 0:t.cart_hash]),i.jQuery(document.body).trigger("update_checkout")}catch{}try{window.dispatchEvent(new CustomEvent("woocommerce:cart_updated",{detail:t})),document.body.dispatchEvent(new CustomEvent(e,{detail:t})),document.body.dispatchEvent(new CustomEvent("wc_fragment_refresh"))}catch{}}}class C{constructor(){f(this,"siteKey","colbolt_live");f(this,"apiUrl","http://localhost:3000");f(this,"customLogoUrl");f(this,"shadowRoot");f(this,"isOpen",!1);f(this,"isActionMenuOpen",!1);f(this,"conversationId",`conv_${Date.now()}`);f(this,"config",null);f(this,"isWaitingForResponse",!1);f(this,"cartItems",[]);this.extractAttributes()}extractAttributes(){const t=document.querySelectorAll("script");for(let i=t.length-1;i>=0;i--){const a=t[i];if(a.src&&(a.src.includes("widget.js")||a.getAttribute("data-site-key"))){const r=a.getAttribute("data-site-key");r&&(this.siteKey=r);const s=a.getAttribute("data-api-url");if(s)this.apiUrl=s.replace(/\/+$/,"");else try{const o=new URL(a.src);o.hostname.includes("colbolt.hawksnfox.com")||(this.apiUrl=o.origin)}catch{}break}}const e=window.UniversalChatbotConfig;e&&(e.siteKey&&(this.siteKey=e.siteKey),e.apiUrl&&(this.apiUrl=e.apiUrl.replace(/\/+$/,"")),e.logoUrl&&(this.customLogoUrl=e.logoUrl))}async init(){const t=document.createElement("div");t.id="universal-chatbot-root",document.body.appendChild(t),this.shadowRoot=t.attachShadow({mode:"open"}),await this.fetchConfig(),this.render(),this.bindEvents(),m.fetchLiveCart().then(e=>{e&&e.length>0&&(this.cartItems=e,this.updateCartUI())}).catch(()=>{})}async fetchConfig(){try{const t=await fetch(`${this.apiUrl}/api/tenant/config?siteKey=${encodeURIComponent(this.siteKey)}`);t.ok&&(this.config=await t.json())}catch(t){console.warn("[UniversalChatbot] Using fallback default config:",t)}this.config?this.customLogoUrl&&(this.config.brand.logoUrl=this.customLogoUrl):this.config={siteKey:this.siteKey,brand:{companyName:"Colbolt",assistantName:"COLBOLT.",logoUrl:this.customLogoUrl||`${this.apiUrl}/static/assistance.gif`,primaryColor:"#16408a",launcherPosition:"bottom-right",welcomeMessage:"Hello! Welcome to Colbolt. I can help you find products (like Bacteriostatic Water, Tirz, Retatrutide), check prices within your budget, or add items directly to your cart. How can I help you today?",suggestedQuestions:["What does Colbolt do?","Show me Tirz products","What is Bacteriostatic Water?","What are your shipping policies?"]},company:{businessName:"Colbolt",aboutUs:"Colbolt provides premium quality research solutions and peptides."},commerceType:"woocommerce",activeTools:["search_products","add_to_cart","tile_calculator"]}}getAvatarHtml(t=36){var i,a;const e=this.customLogoUrl||((a=(i=this.config)==null?void 0:i.brand)==null?void 0:a.logoUrl)||`${this.apiUrl}/static/assistance.gif`;return e?`<img src="${e}" alt="Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" onerror="this.onerror=null;this.src='${this.apiUrl}/static/assistance.gif';">`:`
+  `}class g{static isWpStorefront(){return typeof window<"u"&&(window.location.hostname.includes("colbolt.hawksnfox.com")||!!window.wc_store_api_nonce||!!window.wc_add_to_cart_params||!!window.woocommerce_params)}static getHeaders(){var e,i;const t={"Content-Type":"application/json",Accept:"application/json"};if(typeof window<"u"){const r=window.wc_store_api_nonce||((e=window.UniversalChatbotConfig)==null?void 0:e.nonce)||((i=document.querySelector('meta[name="wc-store-api-nonce"]'))==null?void 0:i.content);r&&(t.Nonce=r)}return t}static async fetchLiveCart(){if(!this.isWpStorefront())return null;try{const t=await fetch(`${window.location.origin}/wp-json/wc/store/v1/cart`,{method:"GET",headers:this.getHeaders(),credentials:"include"});if(t.ok)return((await t.json()).items||[]).map(i=>{var r,s,o;return{key:i.key,id:String(i.id),title:i.name,quantity:i.quantity,price:(r=i.prices)!=null&&r.price?Number(i.prices.price)/Math.pow(10,i.prices.currency_minor_unit||2):0,image:((o=(s=i.images)==null?void 0:s[0])==null?void 0:o.src)||""}})}catch(t){console.warn("[WooCommerceBridge] fetchLiveCart error:",t)}return null}static async executeCartAddition(t,e=1,i){if(this.isWpStorefront()){try{const r=i||`${window.location.origin}/wp-json/wc/store/v1/cart/add-item`,s=await fetch(r,{method:"POST",headers:this.getHeaders(),credentials:"include",body:JSON.stringify({id:Number(t),quantity:e})});if(s.ok){const o=await s.json();return this.triggerWooCommerceEvents(o,"added_to_cart"),{success:!0,message:"Added to cart!",cartCount:o==null?void 0:o.items_count,cartData:o}}}catch(r){console.warn("[WooCommerceBridge] Direct Store API call failed, trying wc-ajax fallback:",r)}try{const r=new FormData;r.append("product_id",String(t)),r.append("quantity",String(e));const s=await fetch(`${window.location.origin}/?wc-ajax=add_to_cart`,{method:"POST",credentials:"include",body:r});if(s.ok){const o=await s.json().catch(()=>({}));return this.triggerWooCommerceEvents(o,"added_to_cart"),{success:!0,message:"Added to cart!",cartData:o}}}catch(r){console.error("[WooCommerceBridge] wc-ajax fallback error:",r)}}return this.triggerWooCommerceEvents({items_count:1},"added_to_cart"),{success:!0,message:"Item added to your shopping cart!"}}static async executeCartRemoval(t){if(this.isWpStorefront()){try{const e=await fetch(`${window.location.origin}/wp-json/wc/store/v1/cart`,{method:"GET",headers:this.getHeaders(),credentials:"include"});if(e.ok){const r=((await e.json()).items||[]).find(a=>a.key===String(t)||String(a.id)===String(t)||a.name.toLowerCase().includes(String(t).toLowerCase())),s=r?r.key:String(t),o=await fetch(`${window.location.origin}/wp-json/wc/store/v1/cart/remove-item`,{method:"POST",headers:this.getHeaders(),credentials:"include",body:JSON.stringify({key:s})});if(o.ok){const a=await o.json();return this.triggerWooCommerceEvents(a,"removed_from_cart"),{success:!0,message:"Item removed from cart!",cartCount:a==null?void 0:a.items_count,cartData:a}}}}catch(e){console.warn("[WooCommerceBridge] Store API removal failed, trying fallback:",e)}try{const e=new FormData;e.append("cart_item_key",String(t)),await fetch(`${window.location.origin}/?wc-ajax=remove_from_cart`,{method:"POST",credentials:"include",body:e})}catch{}}return this.triggerWooCommerceEvents({items_count:0},"removed_from_cart"),{success:!0,message:"Item removed from cart."}}static async executeCartUpdate(t,e){if(e<=0)return this.executeCartRemoval(t);if(this.isWpStorefront())try{const i=await fetch(`${window.location.origin}/wp-json/wc/store/v1/cart`,{method:"GET",headers:this.getHeaders(),credentials:"include"});if(i.ok){const s=((await i.json()).items||[]).find(n=>n.key===String(t)||String(n.id)===String(t)||n.name.toLowerCase().includes(String(t).toLowerCase())),o=s?s.key:String(t),a=await fetch(`${window.location.origin}/wp-json/wc/store/v1/cart/update-item`,{method:"POST",headers:this.getHeaders(),credentials:"include",body:JSON.stringify({key:o,quantity:Number(e)})});if(a.ok){const n=await a.json();return this.triggerWooCommerceEvents(n,"added_to_cart"),{success:!0,message:"Cart updated successfully!",cartCount:n==null?void 0:n.items_count,cartData:n}}}}catch(i){console.warn("[WooCommerceBridge] Store API update-item error:",i)}return this.triggerWooCommerceEvents({items_count:e},"added_to_cart"),{success:!0,message:"Cart quantity updated."}}static async clearStoreCart(){if(this.isWpStorefront())try{const t=await this.fetchLiveCart();if(t&&t.length>0)for(const e of t)await this.executeCartRemoval(e.key)}catch(t){console.warn("[WooCommerceBridge] clearStoreCart error:",t)}}static triggerWooCommerceEvents(t,e="added_to_cart"){if(typeof window>"u")return;const i=window;if(i.jQuery)try{i.jQuery(document.body).trigger("wc_fragment_refresh"),i.jQuery(document.body).trigger(e,[t==null?void 0:t.fragments,t==null?void 0:t.cart_hash]),i.jQuery(document.body).trigger("update_checkout")}catch{}try{window.dispatchEvent(new CustomEvent("woocommerce:cart_updated",{detail:t})),document.body.dispatchEvent(new CustomEvent(e,{detail:t})),document.body.dispatchEvent(new CustomEvent("wc_fragment_refresh"))}catch{}}}class C{constructor(){u(this,"siteKey","colbolt_live");u(this,"apiUrl","http://localhost:3000");u(this,"customLogoUrl");u(this,"shadowRoot");u(this,"isOpen",!1);u(this,"isActionMenuOpen",!1);u(this,"conversationId",`conv_${Date.now()}`);u(this,"config",null);u(this,"isWaitingForResponse",!1);u(this,"cartItems",[]);this.extractAttributes()}extractAttributes(){const t=document.querySelectorAll("script");for(let i=t.length-1;i>=0;i--){const r=t[i];if(r.src&&(r.src.includes("widget.js")||r.getAttribute("data-site-key"))){const s=r.getAttribute("data-site-key");s&&(this.siteKey=s);const o=r.getAttribute("data-api-url");if(o)this.apiUrl=o.replace(/\/+$/,"");else try{const a=new URL(r.src);a.hostname.includes("colbolt.hawksnfox.com")||(this.apiUrl=a.origin)}catch{}break}}const e=window.UniversalChatbotConfig;e&&(e.siteKey&&(this.siteKey=e.siteKey),e.apiUrl&&(this.apiUrl=e.apiUrl.replace(/\/+$/,"")),e.logoUrl&&(this.customLogoUrl=e.logoUrl))}async init(){const t=document.createElement("div");t.id="universal-chatbot-root",document.body.appendChild(t),this.shadowRoot=t.attachShadow({mode:"open"}),await this.fetchConfig(),this.render(),this.bindEvents(),g.fetchLiveCart().then(e=>{e&&e.length>0&&(this.cartItems=e,this.updateCartUI())}).catch(()=>{})}async fetchConfig(){try{const t=await fetch(`${this.apiUrl}/api/tenant/config?siteKey=${encodeURIComponent(this.siteKey)}`);t.ok&&(this.config=await t.json())}catch(t){console.warn("[UniversalChatbot] Using fallback default config:",t)}this.config?this.customLogoUrl&&(this.config.brand.logoUrl=this.customLogoUrl):this.config={siteKey:this.siteKey,brand:{companyName:"Colbolt",assistantName:"COLBOLT.",logoUrl:this.customLogoUrl||`${this.apiUrl}/static/assistance.gif`,primaryColor:"#16408a",launcherPosition:"bottom-right",welcomeMessage:"Hello! Welcome to Colbolt. I can help you find products (like Bacteriostatic Water, Tirz, Retatrutide), check prices within your budget, or add items directly to your cart. How can I help you today?",suggestedQuestions:["What does Colbolt do?","Show me Tirz products","What is Bacteriostatic Water?","What are your shipping policies?"]},company:{businessName:"Colbolt",aboutUs:"Colbolt provides premium quality research solutions and peptides."},commerceType:"woocommerce",activeTools:["search_products","add_to_cart","tile_calculator"]}}getAvatarHtml(t=36){var i,r;const e=this.customLogoUrl||((r=(i=this.config)==null?void 0:i.brand)==null?void 0:r.logoUrl)||`${this.apiUrl}/static/assistance.gif`;return e?`<img src="${e}" alt="Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" onerror="this.onerror=null;this.src='${this.apiUrl}/static/assistance.gif';">`:`
       <svg viewBox="0 0 24 24" style="width:${t*.6}px;height:${t*.6}px;fill:currentColor">
         <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.72V7h2a7 7 0 0 1 7 7v1a3 3 0 0 1-3 3h-1.17l-2.41 2.41A2 2 0 0 1 14 21H10a2 2 0 0 1-1.41-.59L6.17 18H5a3 3 0 0 1-3-3v-1a7 7 0 0 1 7-7h2V5.72c-.6-.34-1-.98-1-1.72a2 2 0 0 1 2-2z"/>
       </svg>
-    `}getTimeString(){return new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}render(){var l;const t=(l=this.config)==null?void 0:l.brand,e=(t==null?void 0:t.primaryColor)||"#1e73be",i=(t==null?void 0:t.launcherPosition)||"bottom-right",a=(t==null?void 0:t.companyName)||"Colbolt",r=(t==null?void 0:t.assistantName)||"COLBOLT.",s=document.createElement("style");s.textContent=u(e,i),this.shadowRoot.appendChild(s);const o=document.createElement("div");o.className="chatbot-container",o.innerHTML=`
+    `}getTimeString(){return new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}render(){var n;const t=(n=this.config)==null?void 0:n.brand,e=(t==null?void 0:t.primaryColor)||"#1e73be",i=(t==null?void 0:t.launcherPosition)||"bottom-right",r=(t==null?void 0:t.companyName)||"Colbolt",s=(t==null?void 0:t.assistantName)||"COLBOLT.",o=document.createElement("style");o.textContent=m(e,i),this.shadowRoot.appendChild(o);const a=document.createElement("div");a.className="chatbot-container",a.innerHTML=`
       <!-- High-End Liquid Glass Floating Pill Launcher -->
       <div class="launcher-pill" id="launcherBtn" role="button" tabindex="0" aria-label="Open Chat">
         <div class="launcher-avatar-wrap">
@@ -1189,7 +1197,7 @@ var I=Object.defineProperty;var T=(x,u,m)=>u in x?I(x,u,{enumerable:!0,configura
         </div>
         <div class="launcher-text-wrap">
           <div class="launcher-headline">
-            <span class="launcher-title">${this.escapeHtml(r)}</span>
+            <span class="launcher-title">${this.escapeHtml(s)}</span>
             <span class="launcher-pill-status">● Live</span>
           </div>
           <div class="launcher-sub">Order & Research Specialist</div>
@@ -1206,7 +1214,7 @@ var I=Object.defineProperty;var T=(x,u,m)=>u in x?I(x,u,{enumerable:!0,configura
             </div>
             <div class="banner-text-group">
               <span class="banner-greeting">Hi, I am</span>
-              <span class="banner-assistant-name">${this.escapeHtml(r)}</span>
+              <span class="banner-assistant-name">${this.escapeHtml(s)}</span>
               <span class="banner-tagline">Research Concierge & Support</span>
             </div>
           </div>
@@ -1224,7 +1232,7 @@ var I=Object.defineProperty;var T=(x,u,m)=>u in x?I(x,u,{enumerable:!0,configura
 
         <!-- Store Sub-Intro Banner -->
         <div class="store-sub-intro">
-          <div class="store-title">Welcome to ${this.escapeHtml(a)}</div>
+          <div class="store-title">Welcome to ${this.escapeHtml(r)}</div>
           <div class="store-subtitle">Ask anything about compounds, research, live orders, or cart</div>
         </div>
 
@@ -1311,8 +1319,6 @@ var I=Object.defineProperty;var T=(x,u,m)=>u in x?I(x,u,{enumerable:!0,configura
             Clear Conversation
           </button>
         </div>
-          </button>
-        </div>
 
         <!-- Modern Bottom Input Bar (YANA Style with + button) -->
         <div class="chat-footer">
@@ -1329,29 +1335,29 @@ var I=Object.defineProperty;var T=(x,u,m)=>u in x?I(x,u,{enumerable:!0,configura
           </div>
         </div>
       </div>
-    `,this.shadowRoot.appendChild(o)}bindEvents(){const t=this.shadowRoot.getElementById("launcherBtn"),e=this.shadowRoot.getElementById("closeBtn"),i=this.shadowRoot.getElementById("sendBtn"),a=this.shadowRoot.getElementById("actionPlusBtn"),r=this.shadowRoot.getElementById("actionMenu"),s=this.shadowRoot.getElementById("chatInput"),o=this.shadowRoot.getElementById("chatBody");t==null||t.addEventListener("click",()=>this.toggle()),e==null||e.addEventListener("click",()=>this.toggle(!1)),a==null||a.addEventListener("click",h=>{h.stopPropagation(),this.isActionMenuOpen=!this.isActionMenuOpen,this.isActionMenuOpen?r==null||r.classList.remove("hidden"):r==null||r.classList.add("hidden")}),o==null||o.addEventListener("click",()=>{this.isActionMenuOpen&&(this.isActionMenuOpen=!1,r==null||r.classList.add("hidden"))}),r==null||r.addEventListener("click",h=>{const n=h.target.closest(".action-menu-item");if(!n)return;const d=n.getAttribute("data-action");this.isActionMenuOpen=!1,r.classList.add("hidden"),d==="manage_cart"?this.openCartDrawer():d==="track_order"?this.sendMessage("Track my order"):d==="all_products"?this.sendMessage("Show me all products"):d==="tile_calculator"?this.renderTileCalculatorWidget():d==="shipping"?this.sendMessage("What is your shipping policy?"):d==="clear_chat"&&this.clearChat()});const l=this.shadowRoot.getElementById("cartStripToggle"),c=this.shadowRoot.getElementById("cartStripManageBtn"),g=this.shadowRoot.getElementById("closeCartDrawerBtn"),v=this.shadowRoot.getElementById("drawerClearCartBtn"),b=this.shadowRoot.getElementById("cartDrawerItems");l==null||l.addEventListener("click",()=>this.openCartDrawer()),c==null||c.addEventListener("click",()=>this.openCartDrawer()),g==null||g.addEventListener("click",()=>this.closeCartDrawer()),v==null||v.addEventListener("click",()=>this.handleClearAllCart()),b==null||b.addEventListener("click",h=>{const n=h.target,d=n.classList.contains("drawer-item-remove-btn")?n:n.closest(".drawer-item-remove-btn");if(d){const p=d.getAttribute("data-product-id"),w=d.getAttribute("data-product-title");p&&this.handleRemoveFromCart(p,w||"Item")}}),i==null||i.addEventListener("click",()=>this.handleUserSend()),s==null||s.addEventListener("keydown",h=>{h.key==="Enter"?(h.preventDefault(),this.handleUserSend()):h.key==="Escape"&&this.isOpen&&this.toggle(!1)}),o==null||o.addEventListener("click",h=>{var d;const n=h.target;if(n.classList.contains("quick-reply-btn")){const p=n.getAttribute("data-text");p&&this.sendMessage(p)}else if(n.classList.contains("add-to-cart-btn")||n.closest(".add-to-cart-btn")){const p=n.classList.contains("add-to-cart-btn")?n:n.closest(".add-to-cart-btn"),w=p.getAttribute("data-product-id"),y=p.closest(".product-card"),S=y==null?void 0:y.querySelector(".qty-display"),B=S?parseInt(S.textContent||"1",10):1;w&&this.handleAddToCart(p,w,B)}else if(n.classList.contains("qty-btn")){const p=n.getAttribute("data-action")==="plus",w=(d=n.parentElement)==null?void 0:d.querySelector(".qty-display");if(w){let y=parseInt(w.textContent||"1",10);y=p?y+1:Math.max(1,y-1),w.textContent=String(y)}}else n.classList.contains("tile-calc-submit-btn")&&this.handleTileCalculation(n)})}toggle(t){this.isOpen=t!==void 0?t:!this.isOpen;const e=this.shadowRoot.getElementById("chatWindow"),i=this.shadowRoot.getElementById("launcherBtn"),a=this.shadowRoot.getElementById("chatInput");this.isOpen?(e==null||e.classList.remove("hidden"),i&&(i.style.opacity="0.9"),setTimeout(()=>a==null?void 0:a.focus(),150)):(e==null||e.classList.add("hidden"),i&&(i.style.opacity="1"))}handleUserSend(){const t=this.shadowRoot.getElementById("chatInput"),e=t.value.trim();!e||this.isWaitingForResponse||(t.value="",this.sendMessage(e))}async sendMessage(t){const e=this.shadowRoot.getElementById("chatBody");if(!e)return;const i=document.createElement("div");i.className="message-row user",i.innerHTML=`
+    `,this.shadowRoot.appendChild(a)}bindEvents(){const t=this.shadowRoot.getElementById("launcherBtn"),e=this.shadowRoot.getElementById("closeBtn"),i=this.shadowRoot.getElementById("sendBtn"),r=this.shadowRoot.getElementById("actionPlusBtn"),s=this.shadowRoot.getElementById("actionMenu"),o=this.shadowRoot.getElementById("chatInput"),a=this.shadowRoot.getElementById("chatBody");t==null||t.addEventListener("click",()=>this.toggle()),e==null||e.addEventListener("click",()=>this.toggle(!1)),r==null||r.addEventListener("click",h=>{h.stopPropagation(),this.isActionMenuOpen=!this.isActionMenuOpen,this.isActionMenuOpen?s==null||s.classList.remove("hidden"):s==null||s.classList.add("hidden")}),a==null||a.addEventListener("click",()=>{this.isActionMenuOpen&&(this.isActionMenuOpen=!1,s==null||s.classList.add("hidden"))}),s==null||s.addEventListener("click",h=>{const d=h.target.closest(".action-menu-item");if(!d)return;const l=d.getAttribute("data-action");this.isActionMenuOpen=!1,s.classList.add("hidden"),l==="manage_cart"?this.openCartDrawer():l==="track_order"?this.sendMessage("Track my order"):l==="all_products"?this.sendMessage("Show me all products"):l==="tile_calculator"?this.renderTileCalculatorWidget():l==="shipping"?this.sendMessage("What is your shipping policy?"):l==="clear_chat"&&this.clearChat()});const n=this.shadowRoot.getElementById("cartStripToggle"),c=this.shadowRoot.getElementById("cartStripManageBtn"),f=this.shadowRoot.getElementById("closeCartDrawerBtn"),v=this.shadowRoot.getElementById("drawerClearCartBtn"),b=this.shadowRoot.getElementById("cartDrawerItems");n==null||n.addEventListener("click",()=>this.openCartDrawer()),c==null||c.addEventListener("click",()=>this.openCartDrawer()),f==null||f.addEventListener("click",()=>this.closeCartDrawer()),v==null||v.addEventListener("click",()=>this.handleClearAllCart()),b==null||b.addEventListener("click",h=>{const d=h.target,l=d.classList.contains("drawer-item-remove-btn")?d:d.closest(".drawer-item-remove-btn");if(l){const p=l.getAttribute("data-product-id"),w=l.getAttribute("data-product-title");p&&this.handleRemoveFromCart(p,w||"Item")}}),i==null||i.addEventListener("click",()=>this.handleUserSend()),o==null||o.addEventListener("keydown",h=>{h.key==="Enter"?(h.preventDefault(),this.handleUserSend()):h.key==="Escape"&&this.isOpen&&this.toggle(!1)}),a==null||a.addEventListener("click",h=>{var l;const d=h.target;if(d.classList.contains("quick-reply-btn")){const p=d.getAttribute("data-text");p&&this.sendMessage(p)}else if(d.classList.contains("add-to-cart-btn")||d.closest(".add-to-cart-btn")){const p=d.classList.contains("add-to-cart-btn")?d:d.closest(".add-to-cart-btn"),w=p.getAttribute("data-product-id"),y=p.closest(".product-card"),S=y==null?void 0:y.querySelector(".qty-display"),I=S?parseInt(S.textContent||"1",10):1;w&&this.handleAddToCart(p,w,I)}else if(d.classList.contains("qty-btn")){const p=d.getAttribute("data-action")==="plus",w=(l=d.parentElement)==null?void 0:l.querySelector(".qty-display");if(w){let y=parseInt(w.textContent||"1",10);y=p?y+1:Math.max(1,y-1),w.textContent=String(y)}}else d.classList.contains("tile-calc-submit-btn")&&this.handleTileCalculation(d)})}toggle(t){this.isOpen=t!==void 0?t:!this.isOpen;const e=this.shadowRoot.getElementById("chatWindow"),i=this.shadowRoot.getElementById("launcherBtn"),r=this.shadowRoot.getElementById("chatInput");this.isOpen?(e==null||e.classList.remove("hidden"),i&&(i.style.opacity="0.9"),setTimeout(()=>r==null?void 0:r.focus(),150)):(e==null||e.classList.add("hidden"),i&&(i.style.opacity="1"))}handleUserSend(){const t=this.shadowRoot.getElementById("chatInput"),e=t.value.trim();!e||this.isWaitingForResponse||(t.value="",this.sendMessage(e))}async sendMessage(t){const e=this.shadowRoot.getElementById("chatBody");if(!e)return;const i=document.createElement("div");i.className="message-row user",i.innerHTML=`
       <div class="message-content-group">
         <div class="message-bubble user">${this.escapeHtml(t)}</div>
         <span class="message-timestamp">${this.getTimeString()}</span>
       </div>
-    `,e.appendChild(i);const a=document.createElement("div");a.className="typing-indicator",a.id="activeTypingIndicator",a.innerHTML=`
+    `,e.appendChild(i);const r=document.createElement("div");r.className="typing-indicator",r.id="activeTypingIndicator",r.innerHTML=`
       <span class="typing-dot"></span>
       <span class="typing-dot"></span>
       <span class="typing-dot"></span>
-    `,e.appendChild(a),e.scrollTop=e.scrollHeight,this.isWaitingForResponse=!0;try{const r=await fetch(`${this.apiUrl}/api/chat/message`,{method:"POST",headers:{"Content-Type":"application/json","X-Site-Key":this.siteKey},body:JSON.stringify({siteKey:this.siteKey,conversationId:this.conversationId,message:t,cartItems:this.cartItems})});if(a.remove(),this.isWaitingForResponse=!1,!r.ok)throw new Error(`Server returned ${r.status}`);const s=await r.json();this.renderBotResponse(s)}catch{a.remove(),this.isWaitingForResponse=!1,this.renderBotResponse({message:"I am currently having trouble reaching the store catalog. Please try again in a moment."})}}renderBotResponse(t){const e=this.shadowRoot.getElementById("chatBody");if(!e)return;const i=document.createElement("div");i.className="message-row assistant";const a=this.formatMarkdown(t.message||"");let r="";Array.isArray(t.productCards)&&t.productCards.length>0&&(r=`
+    `,e.appendChild(r),e.scrollTop=e.scrollHeight,this.isWaitingForResponse=!0;try{const s=await fetch(`${this.apiUrl}/api/chat/message`,{method:"POST",headers:{"Content-Type":"application/json","X-Site-Key":this.siteKey},body:JSON.stringify({siteKey:this.siteKey,conversationId:this.conversationId,message:t,cartItems:this.cartItems})});if(r.remove(),this.isWaitingForResponse=!1,!s.ok)throw new Error(`Server returned ${s.status}`);const o=await s.json();this.renderBotResponse(o)}catch{r.remove(),this.isWaitingForResponse=!1,this.renderBotResponse({message:"I am currently having trouble reaching the store catalog. Please try again in a moment."})}}renderBotResponse(t){const e=this.shadowRoot.getElementById("chatBody");if(!e)return;if(t.cartAction){const a=t.cartAction;if(a.type==="remove")g.executeCartRemoval(a.productId||a.title).catch(()=>{}),this.cartItems=this.cartItems.filter(n=>n.id!==String(a.productId)&&(!a.title||!n.title.toLowerCase().includes(String(a.title).toLowerCase()))),this.updateCartUI();else if(a.type==="add"&&a.item){g.executeCartAddition(a.item.id,a.item.quantity||1).catch(()=>{});const n=this.cartItems.find(c=>c.id===String(a.item.id));n?n.quantity+=a.item.quantity||1:this.cartItems.push({id:String(a.item.id),title:a.item.title,price:Number(a.item.price||0),quantity:a.item.quantity||1}),this.updateCartUI()}else if(a.type==="update"&&a.item){g.executeCartUpdate(a.item.id,a.item.quantity).catch(()=>{});const n=this.cartItems.find(c=>c.id===String(a.item.id));n&&(n.quantity=a.item.quantity),this.updateCartUI()}else a.type==="clear"&&(g.clearStoreCart().catch(()=>{}),this.cartItems=[],this.updateCartUI())}const i=document.createElement("div");i.className="message-row assistant";const r=this.formatMarkdown(t.message||"");let s="";Array.isArray(t.productCards)&&t.productCards.length>0&&(s=`
         <div class="product-cards-container">
-          ${t.productCards.map(o=>{var l;return`
+          ${t.productCards.map(a=>{var n;return`
             <div class="product-card">
-              ${o.featuredImage?`
+              ${a.featuredImage?`
                 <div class="product-img-wrap">
-                  <img class="product-img" src="${o.featuredImage}" alt="${this.escapeHtml(o.title)}" loading="lazy">
-                  <span class="product-stock-tag">${o.inStock?"In Stock":"Out of Stock"}</span>
+                  <img class="product-img" src="${a.featuredImage}" alt="${this.escapeHtml(a.title)}" loading="lazy">
+                  <span class="product-stock-tag">${a.inStock?"In Stock":"Out of Stock"}</span>
                 </div>
               `:""}
               <div class="product-details">
-                <span class="product-title">${this.escapeHtml(o.title)}</span>
+                <span class="product-title">${this.escapeHtml(a.title)}</span>
                 <div class="product-price-row">
-                  <span class="product-price">${((l=o.price)==null?void 0:l.formatted)||"$0.00"}</span>
+                  <span class="product-price">${((n=a.price)==null?void 0:n.formatted)||"$0.00"}</span>
                 </div>
                 <div class="product-actions">
                   <div class="qty-picker">
@@ -1359,7 +1365,7 @@ var I=Object.defineProperty;var T=(x,u,m)=>u in x?I(x,u,{enumerable:!0,configura
                     <span class="qty-display">1</span>
                     <button class="qty-btn" data-action="plus" aria-label="Increase quantity">+</button>
                   </div>
-                  <button class="add-to-cart-btn" data-product-id="${o.id}">
+                  <button class="add-to-cart-btn" data-product-id="${a.id}">
                     <svg style="width:14px;height:14px;fill:currentColor" viewBox="0 0 24 24"><path d="M11 9h2V6h3V4h-3V1h-2v3H8v2h3v3zm-4 9c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2zm-9.83-3.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.86-7.01L19.42 4h-.01l-1.1 2-2.76 5H8.53l-.13-.27L6.16 6l-.95-2-.94-2H1v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.13 0-.25-.11-.25-.25z"/></svg>
                     Add to Cart
                   </button>
@@ -1368,10 +1374,10 @@ var I=Object.defineProperty;var T=(x,u,m)=>u in x?I(x,u,{enumerable:!0,configura
             </div>
           `}).join("")}
         </div>
-      `);let s="";Array.isArray(t.quickReplies)&&t.quickReplies.length>0&&(s=`
+      `);let o="";Array.isArray(t.quickReplies)&&t.quickReplies.length>0&&(o=`
         <div class="quick-replies">
-          ${t.quickReplies.map(o=>`
-            <button class="quick-reply-btn" data-text="${this.escapeHtml(o.actionText||o.label)}">${this.escapeHtml(o.label)}</button>
+          ${t.quickReplies.map(a=>`
+            <button class="quick-reply-btn" data-text="${this.escapeHtml(a.actionText||a.label)}">${this.escapeHtml(a.label)}</button>
           `).join("")}
         </div>
       `),i.innerHTML=`
@@ -1380,11 +1386,11 @@ var I=Object.defineProperty;var T=(x,u,m)=>u in x?I(x,u,{enumerable:!0,configura
       </div>
       <div class="message-content-group">
         <div class="message-bubble assistant">
-          ${a}
           ${r}
+          ${s}
         </div>
         <span class="message-timestamp">${this.getTimeString()}</span>
-        ${s}
+        ${o}
       </div>
     `,e.appendChild(i),e.scrollTop=e.scrollHeight}renderTileCalculatorWidget(){const t=this.shadowRoot.getElementById("chatBody");if(!t)return;const e=document.createElement("div");e.className="message-row assistant",e.innerHTML=`
       <div class="message-avatar">
@@ -1419,12 +1425,12 @@ var I=Object.defineProperty;var T=(x,u,m)=>u in x?I(x,u,{enumerable:!0,configura
         </div>
         <span class="message-timestamp">${this.getTimeString()}</span>
       </div>
-    `,t.appendChild(e),t.scrollTop=t.scrollHeight}handleTileCalculation(t){var b,h,n,d;const e=t.closest(".tile-calc-card");if(!e)return;const i=parseFloat(((b=e.querySelector(".tile-input-len"))==null?void 0:b.value)||"0"),a=parseFloat(((h=e.querySelector(".tile-input-wid"))==null?void 0:h.value)||"0"),r=parseFloat(((n=e.querySelector(".tile-input-box"))==null?void 0:n.value)||"16"),s=parseFloat(((d=e.querySelector(".tile-input-waste"))==null?void 0:d.value)||"10"),o=e.querySelector(".tile-calc-result");if(!o)return;if(i<=0||a<=0){o.style.display="block",o.style.background="#fef2f2",o.style.color="#991b1b",o.style.borderColor="#fecaca",o.textContent="Please enter valid room dimensions greater than 0.";return}const l=i*a,c=l*s/100,g=l+c,v=Math.ceil(g/(r||16));o.style.display="block",o.style.background="#f0fdf4",o.style.color="#166534",o.style.borderColor="#bbf7d0",o.innerHTML=`
+    `,t.appendChild(e),t.scrollTop=t.scrollHeight}handleTileCalculation(t){var b,h,d,l;const e=t.closest(".tile-calc-card");if(!e)return;const i=parseFloat(((b=e.querySelector(".tile-input-len"))==null?void 0:b.value)||"0"),r=parseFloat(((h=e.querySelector(".tile-input-wid"))==null?void 0:h.value)||"0"),s=parseFloat(((d=e.querySelector(".tile-input-box"))==null?void 0:d.value)||"16"),o=parseFloat(((l=e.querySelector(".tile-input-waste"))==null?void 0:l.value)||"10"),a=e.querySelector(".tile-calc-result");if(!a)return;if(i<=0||r<=0){a.style.display="block",a.style.background="#fef2f2",a.style.color="#991b1b",a.style.borderColor="#fecaca",a.textContent="Please enter valid room dimensions greater than 0.";return}const n=i*r,c=n*o/100,f=n+c,v=Math.ceil(f/(s||16));a.style.display="block",a.style.background="#f0fdf4",a.style.color="#166534",a.style.borderColor="#bbf7d0",a.innerHTML=`
       <strong>Calculation Result:</strong><br>
-      • Room Floor Area: <strong>${l.toFixed(1)} sq ft</strong><br>
-      • Recommended Wastage (${s}%): <strong>+${c.toFixed(1)} sq ft</strong><br>
-      • Total Area to Cover: <strong>${g.toFixed(1)} sq ft</strong><br>
-      • Boxes Needed (${r} sq ft/box): <strong>${v} boxes</strong>
+      • Room Floor Area: <strong>${n.toFixed(1)} sq ft</strong><br>
+      • Recommended Wastage (${o}%): <strong>+${c.toFixed(1)} sq ft</strong><br>
+      • Total Area to Cover: <strong>${f.toFixed(1)} sq ft</strong><br>
+      • Boxes Needed (${s} sq ft/box): <strong>${v} boxes</strong>
     `}clearChat(){const t=this.shadowRoot.getElementById("chatBody");t&&(this.cartItems=[],this.conversationId=`conv_${Date.now()}`,fetch(`${this.apiUrl}/api/cart/clear`,{method:"POST",headers:{"Content-Type":"application/json","X-Site-Key":this.siteKey},body:JSON.stringify({siteKey:this.siteKey,conversationId:this.conversationId})}).catch(()=>{}),t.innerHTML=`
       <div class="message-row assistant">
         <div class="message-avatar">
@@ -1442,7 +1448,7 @@ var I=Object.defineProperty;var T=(x,u,m)=>u in x?I(x,u,{enumerable:!0,configura
           </div>
         </div>
       </div>
-    `)}async handleAddToCart(t,e,i){var v,b;if(t.getAttribute("data-loading")==="true")return;t.setAttribute("data-loading","true");const a=t.innerHTML;t.innerHTML="Adding...",t.style.opacity="0.7";const r=t.closest(".product-card"),s=r==null?void 0:r.querySelector(".product-title"),o=((v=s==null?void 0:s.textContent)==null?void 0:v.trim())||"Selected Product",l=r==null?void 0:r.querySelector(".product-price"),c=((b=l==null?void 0:l.textContent)==null?void 0:b.replace(/[^0-9.]/g,""))||"0",g=parseFloat(c)||0;try{const h=await m.executeCartAddition(e,i);t.innerHTML="✓ Added to Cart",t.classList.add("added"),t.style.opacity="1";const n=this.cartItems.find(p=>p.id===e);n?n.quantity+=i:this.cartItems.push({id:e,title:o,price:g,quantity:i}),this.updateCartUI(),fetch(`${this.apiUrl}/api/cart/add`,{method:"POST",headers:{"Content-Type":"application/json","X-Site-Key":this.siteKey},body:JSON.stringify({siteKey:this.siteKey,conversationId:this.conversationId,productId:e,quantity:i})}).catch(()=>{});const d=this.shadowRoot.getElementById("chatBody");if(d){const p=document.createElement("div");p.className="message-row assistant",p.innerHTML=`
+    `)}async handleAddToCart(t,e,i){var v,b;if(t.getAttribute("data-loading")==="true")return;t.setAttribute("data-loading","true");const r=t.innerHTML;t.innerHTML="Adding...",t.style.opacity="0.7";const s=t.closest(".product-card"),o=s==null?void 0:s.querySelector(".product-title"),a=((v=o==null?void 0:o.textContent)==null?void 0:v.trim())||"Selected Product",n=s==null?void 0:s.querySelector(".product-price"),c=((b=n==null?void 0:n.textContent)==null?void 0:b.replace(/[^0-9.]/g,""))||"0",f=parseFloat(c)||0;try{const h=await g.executeCartAddition(e,i);t.innerHTML="✓ Added to Cart",t.classList.add("added"),t.style.opacity="1";const d=this.cartItems.find(p=>p.id===e);d?d.quantity+=i:this.cartItems.push({id:e,title:a,price:f,quantity:i}),this.updateCartUI(),fetch(`${this.apiUrl}/api/cart/add`,{method:"POST",headers:{"Content-Type":"application/json","X-Site-Key":this.siteKey},body:JSON.stringify({siteKey:this.siteKey,conversationId:this.conversationId,productId:e,quantity:i})}).catch(()=>{});const l=this.shadowRoot.getElementById("chatBody");if(l){const p=document.createElement("div");p.className="message-row assistant",p.innerHTML=`
           <div class="message-avatar">
             ${this.getAvatarHtml(34)}
           </div>
@@ -1456,13 +1462,13 @@ var I=Object.defineProperty;var T=(x,u,m)=>u in x?I(x,u,{enumerable:!0,configura
             </div>
             <span class="message-timestamp">${this.getTimeString()}</span>
           </div>
-        `,d.appendChild(p),d.scrollTop=d.scrollHeight}setTimeout(()=>{t.innerHTML=a,t.classList.remove("added"),t.removeAttribute("data-loading")},3500)}catch{t.innerHTML="Error",t.removeAttribute("data-loading"),setTimeout(()=>{t.innerHTML=a,t.style.opacity="1"},2e3)}}updateCartUI(){const t=this.shadowRoot.getElementById("inchatCartStrip"),e=this.shadowRoot.getElementById("cartStripCountText"),i=this.shadowRoot.getElementById("cartStripTotalText"),a=this.shadowRoot.getElementById("drawerCartBadge"),r=this.shadowRoot.getElementById("drawerTotalPrice"),s=this.shadowRoot.getElementById("cartDrawerItems"),o=this.cartItems.reduce((c,g)=>c+(g.quantity||1),0),l=this.cartItems.reduce((c,g)=>c+(g.price||0)*(g.quantity||1),0);t&&(o>0?(t.classList.remove("hidden"),e&&(e.innerHTML=`<strong>${o}</strong> ${o===1?"item":"items"}`),i&&(i.textContent=`• $${l.toFixed(2)}`)):t.classList.add("hidden")),a&&(a.textContent=String(o)),r&&(r.textContent=`$${l.toFixed(2)}`),s&&(this.cartItems.length===0?s.innerHTML=`
+        `,l.appendChild(p),l.scrollTop=l.scrollHeight}setTimeout(()=>{t.innerHTML=r,t.classList.remove("added"),t.removeAttribute("data-loading")},3500)}catch{t.innerHTML="Error",t.removeAttribute("data-loading"),setTimeout(()=>{t.innerHTML=r,t.style.opacity="1"},2e3)}}updateCartUI(){const t=this.shadowRoot.getElementById("inchatCartStrip"),e=this.shadowRoot.getElementById("cartStripCountText"),i=this.shadowRoot.getElementById("cartStripTotalText"),r=this.shadowRoot.getElementById("drawerCartBadge"),s=this.shadowRoot.getElementById("drawerTotalPrice"),o=this.shadowRoot.getElementById("cartDrawerItems"),a=this.cartItems.reduce((c,f)=>c+(f.quantity||1),0),n=this.cartItems.reduce((c,f)=>c+(f.price||0)*(f.quantity||1),0);t&&(a>0?(t.classList.remove("hidden"),e&&(e.innerHTML=`<strong>${a}</strong> ${a===1?"item":"items"}`),i&&(i.textContent=`• $${n.toFixed(2)}`)):t.classList.add("hidden")),r&&(r.textContent=String(a)),s&&(s.textContent=`$${n.toFixed(2)}`),o&&(this.cartItems.length===0?o.innerHTML=`
           <div class="cart-drawer-empty">
             <div style="font-size:32px; margin-bottom:8px;">🛒</div>
             <p style="font-weight:700; color:var(--text-main); font-size:14px;">Your cart is empty</p>
             <p style="font-size:12px; margin-top:4px;">Add research compounds or Bacteriostatic Water to get started.</p>
           </div>
-        `:s.innerHTML=this.cartItems.map(c=>`
+        `:o.innerHTML=this.cartItems.map(c=>`
           <div class="cart-drawer-item">
             <div class="drawer-item-info">
               <div class="drawer-item-title" title="${this.escapeHtml(c.title)}">${this.escapeHtml(c.title)}</div>
@@ -1475,7 +1481,7 @@ var I=Object.defineProperty;var T=(x,u,m)=>u in x?I(x,u,{enumerable:!0,configura
               </svg>
             </button>
           </div>
-        `).join(""))}openCartDrawer(){const t=this.shadowRoot.getElementById("cartDrawer");t&&(this.updateCartUI(),t.classList.remove("hidden"))}closeCartDrawer(){const t=this.shadowRoot.getElementById("cartDrawer");t&&t.classList.add("hidden")}async handleRemoveFromCart(t,e){const i=this.cartItems.findIndex(r=>String(r.id)===String(t)||r.title.toLowerCase().includes(e.toLowerCase()));i!==-1&&this.cartItems.splice(i,1),this.updateCartUI(),m.executeCartRemoval(t).catch(()=>{}),fetch(`${this.apiUrl}/api/cart/remove`,{method:"POST",headers:{"Content-Type":"application/json","X-Site-Key":this.siteKey},body:JSON.stringify({siteKey:this.siteKey,conversationId:this.conversationId,productId:t})}).catch(()=>{});const a=this.shadowRoot.getElementById("chatBody");if(a){const r=document.createElement("div");r.className="message-row assistant",r.innerHTML=`
+        `).join(""))}openCartDrawer(){const t=this.shadowRoot.getElementById("cartDrawer");t&&(this.updateCartUI(),t.classList.remove("hidden"))}closeCartDrawer(){const t=this.shadowRoot.getElementById("cartDrawer");t&&t.classList.add("hidden")}async handleRemoveFromCart(t,e){const i=this.cartItems.findIndex(s=>String(s.id)===String(t)||s.title.toLowerCase().includes(e.toLowerCase()));i!==-1&&this.cartItems.splice(i,1),this.updateCartUI(),g.executeCartRemoval(t).catch(()=>{}),fetch(`${this.apiUrl}/api/cart/remove`,{method:"POST",headers:{"Content-Type":"application/json","X-Site-Key":this.siteKey},body:JSON.stringify({siteKey:this.siteKey,conversationId:this.conversationId,productId:t})}).catch(()=>{});const r=this.shadowRoot.getElementById("chatBody");if(r){const s=document.createElement("div");s.className="message-row assistant",s.innerHTML=`
         <div class="message-avatar">${this.getAvatarHtml(34)}</div>
         <div class="message-content-group">
           <div class="message-bubble assistant" style="border-left: 3px solid #dc2626;">
@@ -1483,7 +1489,7 @@ var I=Object.defineProperty;var T=(x,u,m)=>u in x?I(x,u,{enumerable:!0,configura
           </div>
           <span class="message-timestamp">${this.getTimeString()}</span>
         </div>
-      `,a.appendChild(r),a.scrollTop=a.scrollHeight}}async handleClearAllCart(){this.cartItems=[],this.updateCartUI(),m.clearStoreCart().catch(()=>{}),fetch(`${this.apiUrl}/api/cart/clear`,{method:"POST",headers:{"Content-Type":"application/json","X-Site-Key":this.siteKey},body:JSON.stringify({siteKey:this.siteKey,conversationId:this.conversationId})}).catch(()=>{}),setTimeout(()=>this.closeCartDrawer(),300);const t=this.shadowRoot.getElementById("chatBody");if(t){const e=document.createElement("div");e.className="message-row assistant",e.innerHTML=`
+      `,r.appendChild(s),r.scrollTop=r.scrollHeight}}async handleClearAllCart(){this.cartItems=[],this.updateCartUI(),g.clearStoreCart().catch(()=>{}),fetch(`${this.apiUrl}/api/cart/clear`,{method:"POST",headers:{"Content-Type":"application/json","X-Site-Key":this.siteKey},body:JSON.stringify({siteKey:this.siteKey,conversationId:this.conversationId})}).catch(()=>{}),setTimeout(()=>this.closeCartDrawer(),300);const t=this.shadowRoot.getElementById("chatBody");if(t){const e=document.createElement("div");e.className="message-row assistant",e.innerHTML=`
         <div class="message-avatar">${this.getAvatarHtml(34)}</div>
         <div class="message-content-group">
           <div class="message-bubble assistant" style="border-left: 3px solid #dc2626;">
