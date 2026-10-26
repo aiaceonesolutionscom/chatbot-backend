@@ -131,4 +131,39 @@ export class UsageTracker {
         }
         return stats;
     }
+    /**
+     * Retrieves full chronological daily records for date filtering
+     */
+    static getTenantDailyRecords(siteKey, fromDate, toDate) {
+        this.ensureInit();
+        const tenantData = this.memoryStore.get(siteKey) || { daily: {} };
+        const dailyMap = tenantData.daily || {};
+        let dates = Object.keys(dailyMap).sort().reverse();
+        if (fromDate) {
+            dates = dates.filter(d => d >= fromDate);
+        }
+        if (toDate) {
+            dates = dates.filter(d => d <= toDate);
+        }
+        // Always include today if empty
+        if (dates.length === 0) {
+            const todayStr = new Date().toISOString().substring(0, 10);
+            return [{
+                    date: todayStr,
+                    messages: 0,
+                    tokens: 0,
+                    estimatedCostUsd: 0
+                }];
+        }
+        return dates.map(d => {
+            const st = dailyMap[d] || { messages: 0, tokens: 0 };
+            const cost = +(st.tokens * 0.0000005).toFixed(4);
+            return {
+                date: d,
+                messages: st.messages,
+                tokens: st.tokens,
+                estimatedCostUsd: cost
+            };
+        });
+    }
 }

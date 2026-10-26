@@ -10,6 +10,8 @@ import { ConversationEngine } from './modules/ai/conversation.engine.js';
 import { CommerceAdapterFactory } from './modules/commerce/adapter.factory.js';
 import { AppLogger } from './utils/logger.js';
 import { UsageTracker } from './modules/analytics/usage.tracker.js';
+import { AuthService } from './modules/auth/auth.service.js';
+import { AdminView } from './modules/admin/admin.view.js';
 
 // Load .env using Node's built-in env loader if present
 if (typeof (process as any).loadEnvFile === 'function') {
@@ -23,13 +25,37 @@ if (typeof (process as any).loadEnvFile === 'function') {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize tenant configurations (including Colbolt live store)
+// Initialize tenant configurations & security authentication
 TenantStore.initializeDefaults();
+AuthService.initialize();
+
+function getAdminSession(req: FastifyRequest): string | undefined {
+  const cookieHeader = req.headers.cookie;
+  if (cookieHeader) {
+    const match = cookieHeader.match(/admin_session=([^;]+)/);
+    if (match) return match[1];
+  }
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7);
+  }
+  return undefined;
+}
 
 export async function buildServer(): Promise<FastifyInstance> {
   const server = Fastify({
     logger: true,
     trustProxy: true
+  });
+
+  // Native urlencoded form parser for login submissions
+  server.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_req, body: string, defaultDone) => {
+    try {
+      const parsed = Object.fromEntries(new URLSearchParams(body));
+      defaultDone(null, parsed);
+    } catch (err: any) {
+      defaultDone(err, undefined);
+    }
   });
 
   // Security: CORS dynamically checked against tenant's allowed origins
@@ -75,21 +101,51 @@ export async function buildServer(): Promise<FastifyInstance> {
     });
   }
 
-  // Serve demo storefront
-  const demoPath = path.resolve(__dirname, '../../../demo');
-  if (fs.existsSync(demoPath)) {
-    server.get('/', async (_req, reply) => {
-      const html = fs.readFileSync(path.join(demoPath, 'index.html'), 'utf-8');
-      reply.header('Content-Type', 'text/html; charset=utf-8');
-      return reply.send(html);
-    });
+  // Serve AceOne Solutions Brand Logo
+  server.get('/aceone-logo.png', async (_req, reply) => {
+    const candidates = [
+      path.resolve(__dirname, '../public/aceone-logo.png'),
+      path.resolve(__dirname, '../../public/aceone-logo.png'),
+      path.resolve(process.cwd(), 'public/aceone-logo.png'),
+      path.resolve(process.cwd(), 'packages/backend/public/aceone-logo.png'),
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        reply.header('Content-Type', 'image/png');
+        reply.header('Cache-Control', 'public, max-age=86400');
+        return reply.send(fs.createReadStream(p));
+      }
+    }
+    return reply.status(404).send('Logo not found');
+  });
 
-    server.get('/demo', async (_req, reply) => {
-      const html = fs.readFileSync(path.join(demoPath, 'index.html'), 'utf-8');
-      reply.header('Content-Type', 'text/html; charset=utf-8');
-      return reply.send(html);
-    });
-  }
+  // Download WordPress Plugin ZIP
+  server.get('/download/wordpress-plugin.zip', async (_req, reply) => {
+    const candidates = [
+      path.resolve(__dirname, '../public/wordpress-plugin.zip'),
+      path.resolve(__dirname, '../../public/wordpress-plugin.zip'),
+      path.resolve(process.cwd(), 'public/wordpress-plugin.zip'),
+      path.resolve(process.cwd(), 'packages/backend/public/wordpress-plugin.zip'),
+      path.resolve(process.cwd(), 'dist-plugin/universal-commerce-ai-chatbot.zip'),
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        reply.header('Content-Type', 'application/zip');
+        reply.header('Content-Disposition', 'attachment; filename="universal-commerce-ai-chatbot.zip"');
+        return reply.send(fs.createReadStream(p));
+      }
+    }
+    return reply.status(404).send('Plugin zip not found');
+  });
+
+  // Root Redirect: redirect / and /demo to /admin
+  server.get('/', async (_req, reply) => {
+    return reply.redirect('/admin');
+  });
+
+  server.get('/demo', async (_req, reply) => {
+    return reply.redirect('/admin');
+  });
   server.get('/api/health', async () => {
     return {
       status: 'healthy',
@@ -99,233 +155,193 @@ export async function buildServer(): Promise<FastifyInstance> {
     };
   });
 
-  // Standalone Multi-Client Admin & Analytics Dashboard: /admin
-  server.get('/admin', async (req: FastifyRequest, reply: FastifyReply) => {
-    const tenants = TenantStore.listAll();
-    const query = req.query as { siteKey?: string };
-    const currentSiteKey = query.siteKey || tenants[0]?.siteKey || 'colbolt_live';
-    const currentStats = UsageTracker.getTenantStats(currentSiteKey);
-    const currentTenant = TenantStore.getBySiteKey(currentSiteKey);
+  // -------------------------------------------------------------
+  // ACEONE SOLUTIONS ADMIN PORTAL & SECURITY CONTROLLERS
+  // -------------------------------------------------------------
 
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Universal AI Commerce Platform — Admin & Analytics</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #0b0f19;
-      --card-bg: #111827;
-      --border: #1f2937;
-      --text: #f9fafb;
-      --text-muted: #9ca3af;
-      --primary: #3b82f6;
-      --success: #10b981;
-      --danger: #ef4444;
-      --font: 'Plus Jakarta Sans', sans-serif;
-      --mono: 'JetBrains Mono', monospace;
+  // Admin Login View: GET /admin/login
+  server.get('/admin/login', async (req: FastifyRequest, reply: FastifyReply) => {
+    const token = getAdminSession(req);
+    if (token && AuthService.isValidSession(token)) {
+      return reply.redirect('/admin');
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: var(--bg); color: var(--text); font-family: var(--font); padding: 28px; line-height: 1.5; }
-    .container { max-width: 1200px; margin: 0 auto; }
-    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
-    .logo-area { display: flex; align-items: center; gap: 14px; }
-    .logo-badge { background: linear-gradient(135deg, #2563eb, #38bdf8); width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; }
-    h1 { font-size: 22px; font-weight: 800; }
-    .subtitle { color: var(--text-muted); font-size: 13px; }
-    .status-pill { display: inline-flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.12); color: #34d399; padding: 6px 14px; border-radius: 30px; font-size: 13px; font-weight: 600; border: 1px solid rgba(16, 185, 129, 0.25); }
-    .pulse-dot { width: 8px; height: 8px; background: #34d399; border-radius: 50%; box-shadow: 0 0 10px #34d399; }
-    
-    .client-selector-bar { background: var(--card-bg); padding: 14px 20px; border-radius: 14px; border: 1px solid var(--border); margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
-    .client-select-group { display: flex; align-items: center; gap: 10px; }
-    .select-label { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-    select.client-dropdown { background: #1f2937; color: #fff; border: 1px solid #374151; padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; outline: none; }
-    
-    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; margin-bottom: 28px; }
-    .stat-card { background: var(--card-bg); padding: 20px; border-radius: 16px; border: 1px solid var(--border); }
-    .stat-title { font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .stat-val { font-size: 32px; font-weight: 800; color: #ffffff; line-height: 1.1; margin-bottom: 4px; }
-    .stat-sub { font-size: 12px; color: var(--text-muted); }
-    .stat-sub.positive { color: #34d399; }
+    const query = req.query as { error?: string };
+    const html = AdminView.renderLoginPage(query.error);
+    reply.header('Content-Type', 'text/html; charset=utf-8');
+    return reply.send(html);
+  });
 
-    .content-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 28px; }
-    @media (max-width: 900px) { .content-grid { grid-template-columns: 1fr; } }
-    .panel { background: var(--card-bg); border-radius: 16px; border: 1px solid var(--border); padding: 22px; }
-    .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
-    .panel-title { font-size: 16px; font-weight: 700; }
+  // Admin Login Action: POST /api/admin/login
+  server.post('/api/admin/login', async (req: FastifyRequest, reply: FastifyReply) => {
+    const body = (req.body as any) || {};
+    const username = (body.username || '').trim();
+    const password = (body.password || '').trim();
+    const clientIp = req.ip || 'unknown';
 
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th { text-align: left; padding: 10px 12px; color: var(--text-muted); border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; }
-    td { padding: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); }
-    tr:last-child td { border-bottom: none; }
-
-    .log-box { background: #080c14; border: 1px solid var(--border); border-radius: 10px; padding: 14px; font-family: var(--mono); font-size: 12px; height: 260px; overflow-y: auto; color: #cbd5e1; white-space: pre-wrap; line-height: 1.6; }
-    .btn { background: #2563eb; color: #fff; border: none; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; text-decoration: none; display: inline-block; }
-    .btn:hover { opacity: 0.9; }
-    .btn.secondary { background: #1f2937; border: 1px solid #374151; color: #e2e8f0; }
-
-    .tenant-badge { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <header>
-      <div class="logo-area">
-        <div class="logo-badge">⚡</div>
-        <div>
-          <h1>Universal AI Commerce Platform</h1>
-          <div class="subtitle">Multi-Tenant Management, Usage Metrics & Error Logs</div>
-        </div>
-      </div>
-      <div class="status-pill">
-        <span class="pulse-dot"></span>
-        Server 24/7 Live
-      </div>
-    </header>
-
-    <div class="client-selector-bar">
-      <div class="client-select-group">
-        <span class="select-label">Select Client / Tenant:</span>
-        <select class="client-dropdown" onchange="window.location.href='/admin?siteKey=' + this.value">
-          ${tenants.map(t => `
-            <option value="${t.siteKey}" ${t.siteKey === currentSiteKey ? 'selected' : ''}>
-              ${t.brand?.companyName || t.siteKey} (${t.siteKey})
-            </option>
-          `).join('')}
-        </select>
-      </div>
-      <div>
-        <span class="tenant-badge">Tenant ID: ${currentTenant?.tenantId || currentSiteKey}</span>
-        <span class="tenant-badge" style="margin-left: 6px;">Commerce: ${currentTenant?.commerce?.type || 'woocommerce'}</span>
-      </div>
-    </div>
-
-    <!-- AI USAGE STATS CARDS -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-title">Today's Usage (Roz Ka)</div>
-        <div class="stat-val">${currentStats.today.messages}</div>
-        <div class="stat-sub positive">~${currentStats.today.tokens.toLocaleString()} tokens consumed today</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-title">This Month (Per Mahina)</div>
-        <div class="stat-val">${currentStats.thisMonth.messages}</div>
-        <div class="stat-sub positive">Month: ${currentStats.thisMonth.month} (~${currentStats.thisMonth.tokens.toLocaleString()} tokens)</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-title">Total Lifetime Turns</div>
-        <div class="stat-val">${currentStats.allTime.totalMessages}</div>
-        <div class="stat-sub">Across all conversations</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-title">Active Clients (Tenants)</div>
-        <div class="stat-val">${tenants.length}</div>
-        <div class="stat-sub">Zero-interference file isolation</div>
-      </div>
-    </div>
-
-    <div class="content-grid">
-      <!-- 7-DAY USAGE BREAKDOWN -->
-      <div class="panel">
-        <div class="panel-header">
-          <div class="panel-title">📅 7-Day Usage Activity (${currentTenant?.brand?.companyName || currentSiteKey})</div>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Conversations</th>
-              <th>Est. Tokens</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${currentStats.recentDays.map(d => `
-              <tr>
-                <td><strong>${d.date}</strong></td>
-                <td>${d.messages}</td>
-                <td>~${d.tokens.toLocaleString()}</td>
-                <td><span style="color: ${d.messages > 0 ? '#34d399' : '#64748b'}; font-weight: 600;">${d.messages > 0 ? 'Active' : 'Idle'}</span></td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-
-      <!-- SERVER ERROR & SYSTEM LOGS -->
-      <div class="panel">
-        <div class="panel-header">
-          <div class="panel-title">🛠️ Live Server Logs (${currentSiteKey})</div>
-          <div>
-            <button class="btn secondary" onclick="loadLogs('error')">Error Log</button>
-            <button class="btn" onclick="loadLogs('audit')">💬 Customer Q&A Audit</button>
-            <button class="btn secondary" onclick="loadLogs('app')">All Logs</button>
-          </div>
-        </div>
-        <div class="log-box" id="logBox">Loading live logs...</div>
-      </div>
-    </div>
-
-    <!-- CLIENTS DEPLOYMENT LIST -->
-    <div class="panel">
-      <div class="panel-header">
-        <div class="panel-title">👥 Multi-Tenant Client Deployment Status</div>
-        <span class="select-label">Add new clients via folder in packages/backend/tenants/</span>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Company Name</th>
-            <th>Site Key</th>
-            <th>Allowed Domains</th>
-            <th>Store URL</th>
-            <th>Monthly Usage</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${tenants.map(t => {
-            const st = UsageTracker.getTenantStats(t.siteKey);
-            return `
-              <tr>
-                <td><strong>${t.brand?.companyName || t.siteKey}</strong></td>
-                <td><code>${t.siteKey}</code></td>
-                <td>${t.allowedOrigins.slice(0, 2).join(', ')}</td>
-                <td><a href="${t.commerce?.woocommerce?.storeUrl || '#'}" target="_blank" style="color: #60a5fa; text-decoration: none;">${t.commerce?.woocommerce?.storeUrl || 'N/A'}</a></td>
-                <td><span class="tenant-badge">${st.thisMonth.messages} msgs</span></td>
-              </tr>
-            `;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <script>
-    async function loadLogs(type) {
-      const box = document.getElementById('logBox');
-      box.textContent = 'Fetching ' + type + ' logs...';
-      try {
-        let endpoint = '/api/logs?key=admin';
-        if (type === 'error') endpoint = '/api/logs/errors?key=admin';
-        if (type === 'audit') endpoint = '/api/logs/audit?key=admin';
-        const res = await fetch(endpoint);
-        const text = await res.text();
-        box.textContent = text || '(No log entries recorded yet)';
-      } catch (e) {
-        box.textContent = 'Error loading logs: ' + e;
+    const result = AuthService.verifyLogin(username, password, clientIp);
+    if (!result.success) {
+      const accept = req.headers.accept || '';
+      if (accept.includes('text/html') || !accept.includes('application/json')) {
+        return reply.redirect(`/admin/login?error=${encodeURIComponent(result.error || 'Authentication failed')}`);
       }
+      return reply.status(401).send({ success: false, error: result.error });
     }
-    // Auto load logs on open
-    loadLogs('audit');
-  </script>
-</body>
-</html>`;
+
+    const isHttps = req.headers['x-forwarded-proto'] === 'https' || (req.socket as any)?.encrypted;
+    const cookie = `admin_session=${result.token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400${isHttps ? '; Secure' : ''}`;
+    reply.header('Set-Cookie', cookie);
+
+    const accept = req.headers.accept || '';
+    if (accept.includes('text/html') || !accept.includes('application/json')) {
+      return reply.redirect('/admin');
+    }
+    return reply.send({ success: true, redirect: '/admin' });
+  });
+
+  // Admin Logout Action: GET /api/admin/logout & POST /api/admin/logout
+  server.all('/api/admin/logout', async (req: FastifyRequest, reply: FastifyReply) => {
+    const token = getAdminSession(req);
+    if (token) {
+      AuthService.revokeSession(token);
+    }
+    reply.header('Set-Cookie', 'admin_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT');
+    return reply.redirect('/admin/login');
+  });
+
+  // AceOne Solutions Protected Admin Dashboard: GET /admin
+  server.get('/admin', async (req: FastifyRequest, reply: FastifyReply) => {
+    const token = getAdminSession(req);
+    if (!token || !AuthService.isValidSession(token)) {
+      return reply.redirect('/admin/login');
+    }
+
+    const tenants = TenantStore.listAll();
+    const query = req.query as {
+      section?: 'overview' | 'chatbots' | 'usage' | 'settings';
+      siteKey?: string;
+      filter?: 'today' | '7days' | '30days' | 'all' | 'custom';
+      fromDate?: string;
+      toDate?: string;
+      search?: string;
+      success?: string;
+      error?: string;
+    };
+
+    const rawSection = query.section || 'overview';
+    const activeTab = (rawSection === 'chatbots' ? 'chatbot' : rawSection) as 'overview' | 'chatbot' | 'usage' | 'settings';
+    const selectedClient = query.siteKey || tenants[0]?.siteKey || 'colbolt_live';
+    const currentTenant = TenantStore.getBySiteKey(selectedClient) || tenants[0];
+    const stats = UsageTracker.getTenantStats(currentTenant?.siteKey || selectedClient);
+
+    const dateFilter = query.filter || '7days';
+    const fromDate = query.fromDate;
+    const toDate = query.toDate;
+    const searchQuery = query.search;
+
+    const auditLogs = AppLogger.getStructuredAudits(currentTenant?.siteKey || selectedClient, dateFilter, searchQuery);
+    const dailyRecords = UsageTracker.getTenantDailyRecords(currentTenant?.siteKey || selectedClient, fromDate, toDate);
+
+    const html = AdminView.renderDashboard({
+      tenants,
+      activeTab: ['overview', 'chatbot', 'usage', 'settings'].includes(activeTab) ? activeTab : 'overview',
+      selectedClient: currentTenant?.siteKey || selectedClient,
+      stats,
+      auditLogs,
+      dailyRecords,
+      csrfToken: token.slice(0, 16)
+    });
 
     reply.header('Content-Type', 'text/html; charset=utf-8');
     return reply.send(html);
+  });
+
+  // Admin Password Change Endpoint: POST /api/admin/change-password
+  server.post('/api/admin/change-password', async (req: FastifyRequest, reply: FastifyReply) => {
+    const token = getAdminSession(req);
+    if (!token || !AuthService.isValidSession(token)) {
+      return reply.status(401).send({ success: false, error: 'Unauthorized. Please login again.' });
+    }
+
+    const body = (req.body as any) || {};
+    const { currentPassword, newPassword } = body;
+    const result = AuthService.updatePassword(currentPassword, newPassword);
+
+    if (!result.success) {
+      return reply.status(400).send(result);
+    }
+    return reply.send({ success: true, message: 'Password updated successfully!' });
+  });
+
+  // Admin Client Tenant Configuration Save: POST /api/admin/tenants/save
+  server.post('/api/admin/tenants/save', async (req: FastifyRequest, reply: FastifyReply) => {
+    const token = getAdminSession(req);
+    if (!token || !AuthService.isValidSession(token)) {
+      return reply.status(401).send({ success: false, error: 'Unauthorized.' });
+    }
+
+    const body = (req.body as any) || {};
+    const { siteKey, updates } = body;
+
+    if (!siteKey || !updates) {
+      return reply.status(400).send({ success: false, error: 'siteKey and updates are required.' });
+    }
+
+    try {
+      const updated = TenantStore.updateTenantOnDisk(siteKey, updates);
+      return reply.send({ success: true, tenant: updated });
+    } catch (err: any) {
+      return reply.status(500).send({ success: false, error: err.message || 'Failed to update tenant configuration' });
+    }
+  });
+
+  // Admin Create New Client Tenant: POST /api/admin/tenants/create
+  server.post('/api/admin/tenants/create', async (req: FastifyRequest, reply: FastifyReply) => {
+    const token = getAdminSession(req);
+    if (!token || !AuthService.isValidSession(token)) {
+      return reply.status(401).send({ success: false, error: 'Unauthorized.' });
+    }
+
+    const body = (req.body as any) || {};
+    const { companyName, siteKey, primaryColor, secondaryColor, storeUrl } = body;
+
+    if (!companyName) {
+      return reply.status(400).send({ success: false, error: 'Company Name is required.' });
+    }
+
+    try {
+      const created = TenantStore.createTenantOnDisk({
+        companyName,
+        siteKey,
+        primaryColor,
+        secondaryColor,
+        storeUrl
+      });
+      return reply.send({ success: true, tenant: created });
+    } catch (err: any) {
+      return reply.status(400).send({ success: false, error: err.message || 'Failed to create client tenant' });
+    }
+  });
+
+  // Admin Delete Client Tenant: POST /api/admin/tenants/delete
+  server.post('/api/admin/tenants/delete', async (req: FastifyRequest, reply: FastifyReply) => {
+    const token = getAdminSession(req);
+    if (!token || !AuthService.isValidSession(token)) {
+      return reply.status(401).send({ success: false, error: 'Unauthorized.' });
+    }
+
+    const body = (req.body as any) || {};
+    const { siteKey } = body;
+
+    if (!siteKey) {
+      return reply.status(400).send({ success: false, error: 'siteKey is required.' });
+    }
+
+    try {
+      const deleted = TenantStore.deleteTenantOnDisk(siteKey);
+      return reply.send({ success: true, deletedSiteKey: deleted });
+    } catch (err: any) {
+      return reply.status(400).send({ success: false, error: err.message || 'Failed to delete client tenant' });
+    }
   });
 
   // Public Tenant Configuration Endpoint (Used by the widget to style itself)

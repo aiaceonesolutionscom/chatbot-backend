@@ -130,4 +130,58 @@ export class AppLogger {
             return `Failed to read chat audit log: ${e}`;
         }
     }
+    /**
+     * Structured, filterable audit log reader for Admin dashboard
+     */
+    static getStructuredAudits(siteKey, dateFilter, search) {
+        try {
+            if (!fs.existsSync(chatAuditFile))
+                return [];
+            const content = fs.readFileSync(chatAuditFile, 'utf-8');
+            const blocks = content.split('================================================================================');
+            const entries = [];
+            for (const block of blocks) {
+                const trimmed = block.trim();
+                if (!trimmed)
+                    continue;
+                const timeMatch = trimmed.match(/TIMESTAMP\s*:\s*([^|]+)\|\s*CLIENT:\s*\[([^\]]+)\]\|\s*SESSION:\s*([^\n]+)/);
+                const latencyMatch = trimmed.match(/LATENCY\s*:\s*([^\n]+)/);
+                const userMatch = trimmed.match(/USER ASKED:\s*"([^"]+)"/);
+                const botMatch = trimmed.match(/BOT REPLIED:\s*\n([\s\S]*?)\n(?:CARDS ATTACHED|$)/);
+                const cardsMatch = trimmed.match(/CARDS ATTACHED[^\n]*/);
+                if (timeMatch && userMatch) {
+                    const entryTime = timeMatch[1].trim();
+                    const entryClient = timeMatch[2].trim();
+                    const entrySession = timeMatch[3].trim();
+                    const entryLatency = latencyMatch ? latencyMatch[1].trim() : '0ms';
+                    const entryUser = userMatch[1].trim();
+                    const entryBot = botMatch ? botMatch[1].trim() : '';
+                    const entryCards = cardsMatch ? cardsMatch[0].trim() : 'None';
+                    if (siteKey && siteKey !== 'all' && entryClient !== siteKey)
+                        continue;
+                    if (dateFilter && !entryTime.startsWith(dateFilter))
+                        continue;
+                    if (search) {
+                        const s = search.toLowerCase();
+                        const textToSearch = (entryUser + ' ' + entryBot + ' ' + entryCards).toLowerCase();
+                        if (!textToSearch.includes(s))
+                            continue;
+                    }
+                    entries.push({
+                        timestamp: entryTime,
+                        siteKey: entryClient,
+                        session: entrySession,
+                        latency: entryLatency,
+                        userAsked: entryUser,
+                        botReplied: entryBot,
+                        cardsAttached: entryCards
+                    });
+                }
+            }
+            return entries.reverse(); // Newest first
+        }
+        catch {
+            return [];
+        }
+    }
 }

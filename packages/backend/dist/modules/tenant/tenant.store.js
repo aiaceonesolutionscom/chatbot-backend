@@ -181,12 +181,146 @@ export class TenantStore {
     }
     static save(tenant) {
         this.tenants.set(tenant.siteKey, tenant);
-        this.tenants.set(tenant.tenantId, tenant);
+        if (tenant.tenantId) {
+            this.tenants.set(tenant.tenantId, tenant);
+        }
+    }
+    /**
+     * Persist tenant updates back to disk in tenants/<folder>/config.json
+     */
+    static updateTenantOnDisk(siteKey, updates) {
+        const cleanSiteKey = siteKey.replace(/[^a-z0-9_-]/gi, '');
+        const tenant = this.getBySiteKey(cleanSiteKey);
+        if (!tenant)
+            return null;
+        // Deep merge updates safely
+        if (updates.brand) {
+            tenant.brand = { ...tenant.brand, ...updates.brand };
+        }
+        if (updates.company) {
+            tenant.company = { ...tenant.company, ...updates.company };
+        }
+        if (updates.commerce) {
+            tenant.commerce = { ...tenant.commerce, ...updates.commerce };
+        }
+        if (updates.ai) {
+            tenant.ai = { ...tenant.ai, ...updates.ai };
+        }
+        if (updates.allowedOrigins) {
+            tenant.allowedOrigins = updates.allowedOrigins;
+        }
+        tenant.updatedAt = new Date().toISOString();
+        // Determine tenant directory
+        const slug = cleanSiteKey.replace(/_live$/i, '').replace(/_/g, '-');
+        const tenantFolder = path.join(this.tenantsDir, slug);
+        if (!fs.existsSync(tenantFolder)) {
+            fs.mkdirSync(tenantFolder, { recursive: true });
+        }
+        const configPath = path.join(tenantFolder, 'config.json');
+        fs.writeFileSync(configPath, JSON.stringify(tenant, null, 2), 'utf-8');
+        // Update in memory
+        this.save(tenant);
+        return tenant;
+    }
+    /**
+     * Create a new client tenant folder and configuration
+     */
+    static createTenantOnDisk(data) {
+        const cleanSiteKey = data.siteKey.replace(/[^a-z0-9_-]/gi, '').toLowerCase();
+        const slug = cleanSiteKey.replace(/_live$/i, '').replace(/_/g, '-');
+        const tenantFolder = path.join(this.tenantsDir, slug);
+        if (!fs.existsSync(tenantFolder)) {
+            fs.mkdirSync(tenantFolder, { recursive: true });
+        }
+        const newTenant = {
+            tenantId: `${slug}-store-01`,
+            siteKey: cleanSiteKey,
+            secretApiKey: `sec_${slug}_${Date.now().toString(36)}`,
+            allowedOrigins: ['*'],
+            brand: {
+                companyName: data.companyName,
+                assistantName: data.assistantName || `${data.companyName.toUpperCase()}.`,
+                logoUrl: '/aceone-logo.png',
+                primaryColor: data.primaryColor || '#1e3a8a',
+                secondaryColor: data.secondaryColor || '#3b82f6',
+                fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+                launcherPosition: 'bottom-right',
+                welcomeMessage: data.welcomeMessage || `Hello! Welcome to ${data.companyName}. How can I assist you with our products and services today?`,
+                suggestedQuestions: [
+                    `What does ${data.companyName} do?`,
+                    'Show me all products',
+                    'What is your shipping policy?'
+                ],
+                whatsAppNumber: '',
+                badgeText: 'Online'
+            },
+            company: {
+                businessName: data.companyName,
+                tagline: `${data.companyName} Official Customer Assistant`,
+                aboutUs: `${data.companyName} provides high quality products and dedicated customer service.`,
+                industry: 'E-Commerce & Retail',
+                services: ['Product Guidance', 'Order Assistance', 'Live Store Support'],
+                shippingPolicy: 'Standard orders are securely processed and dispatched within 24-48 business hours with tracking provided.',
+                deliveryEstimate: 'Standard delivery takes 3-5 business days.',
+                supportEmail: 'support@aceonesolutions.com',
+                faqs: []
+            },
+            commerce: {
+                type: 'woocommerce',
+                woocommerce: {
+                    storeUrl: data.storeUrl || `https://${slug}.com`,
+                    useStoreApi: true
+                }
+            },
+            ai: {
+                provider: 'groq',
+                model: 'openai/gpt-oss-120b',
+                temperature: 0.25,
+                maxTokens: 3000,
+                supportedLanguages: ['en', 'ur', 'roman_ur', 'hi']
+            },
+            activeTools: ['search_products', 'get_product_details', 'add_to_cart'],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        const configPath = path.join(tenantFolder, 'config.json');
+        fs.writeFileSync(configPath, JSON.stringify(newTenant, null, 2), 'utf-8');
+        this.save(newTenant);
+        console.log(`[TenantStore] Successfully created new client tenant: ${data.companyName} (${cleanSiteKey})`);
+        return newTenant;
+    }
+    /**
+     * Delete tenant from disk and memory
+     */
+    static deleteTenantOnDisk(siteKey) {
+        const cleanSiteKey = siteKey.replace(/[^a-z0-9_-]/gi, '');
+        const tenant = this.getBySiteKey(cleanSiteKey);
+        if (!tenant)
+            return false;
+        const slug = cleanSiteKey.replace(/_live$/i, '').replace(/_/g, '-');
+        const tenantFolder = path.join(this.tenantsDir, slug);
+        try {
+            if (fs.existsSync(tenantFolder)) {
+                fs.rmSync(tenantFolder, { recursive: true, force: true });
+            }
+            this.tenants.delete(cleanSiteKey);
+            if (tenant.tenantId) {
+                this.tenants.delete(tenant.tenantId);
+            }
+            console.log(`[TenantStore] Deleted tenant ${cleanSiteKey}`);
+            return true;
+        }
+        catch (e) {
+            console.error(`[TenantStore] Error deleting tenant ${cleanSiteKey}:`, e);
+            return false;
+        }
     }
     static listAll() {
+        // Re-scan disk to ensure all folder tenants are captured
+        this.loadFromDisk();
         const unique = new Map();
         for (const t of this.tenants.values()) {
-            unique.set(t.tenantId || t.siteKey, t);
+            unique.set(t.siteKey, t);
         }
         return Array.from(unique.values());
     }

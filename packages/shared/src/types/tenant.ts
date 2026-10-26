@@ -70,7 +70,7 @@ export interface CommerceConnectorConfig {
   odoo?: OdooCredentials;
 }
 
-export type LLMProviderType = 'openrouter' | 'gemini' | 'openai' | 'mock';
+export type LLMProviderType = 'openrouter' | 'groq' | 'gemini' | 'openai' | 'mock';
 
 export interface AIConfig {
   provider: LLMProviderType;
