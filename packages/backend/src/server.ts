@@ -217,9 +217,13 @@ export async function buildServer(): Promise<FastifyInstance> {
 
     const tenants = TenantStore.listAll();
     const query = req.query as {
+      view?: 'overview' | 'chatbot' | 'usage' | 'settings';
       section?: 'overview' | 'chatbots' | 'usage' | 'settings';
+      client?: string;
       siteKey?: string;
       filter?: 'today' | '7days' | '30days' | 'all' | 'custom';
+      from?: string;
+      to?: string;
       fromDate?: string;
       toDate?: string;
       search?: string;
@@ -227,16 +231,16 @@ export async function buildServer(): Promise<FastifyInstance> {
       error?: string;
     };
 
-    const rawSection = query.section || 'overview';
-    const activeTab = (rawSection === 'chatbots' ? 'chatbot' : rawSection) as 'overview' | 'chatbot' | 'usage' | 'settings';
-    const selectedClient = query.siteKey || tenants[0]?.siteKey || 'colbolt_live';
+    const rawTab = (query.view || query.section || 'overview').toLowerCase();
+    const activeTab = (rawTab === 'chatbots' ? 'chatbot' : rawTab) as 'overview' | 'chatbot' | 'usage' | 'settings';
+    const selectedClient = query.client || query.siteKey || tenants[0]?.siteKey || 'colbolt_live';
     const currentTenant = TenantStore.getBySiteKey(selectedClient) || tenants[0];
     const stats = UsageTracker.getTenantStats(currentTenant?.siteKey || selectedClient);
 
-    const dateFilter = query.filter || '7days';
-    const fromDate = query.fromDate;
-    const toDate = query.toDate;
+    const fromDate = query.from || query.fromDate;
+    const toDate = query.to || query.toDate;
     const searchQuery = query.search;
+    const dateFilter = query.filter || (fromDate || toDate ? 'custom' : '7days');
 
     const auditLogs = AppLogger.getStructuredAudits(currentTenant?.siteKey || selectedClient, dateFilter, searchQuery);
     const dailyRecords = UsageTracker.getTenantDailyRecords(currentTenant?.siteKey || selectedClient, fromDate, toDate);

@@ -196,15 +196,15 @@ export async function buildServer() {
         }
         const tenants = TenantStore.listAll();
         const query = req.query;
-        const rawSection = query.section || 'overview';
-        const activeTab = (rawSection === 'chatbots' ? 'chatbot' : rawSection);
-        const selectedClient = query.siteKey || tenants[0]?.siteKey || 'colbolt_live';
+        const rawTab = (query.view || query.section || 'overview').toLowerCase();
+        const activeTab = (rawTab === 'chatbots' ? 'chatbot' : rawTab);
+        const selectedClient = query.client || query.siteKey || tenants[0]?.siteKey || 'colbolt_live';
         const currentTenant = TenantStore.getBySiteKey(selectedClient) || tenants[0];
         const stats = UsageTracker.getTenantStats(currentTenant?.siteKey || selectedClient);
-        const dateFilter = query.filter || '7days';
-        const fromDate = query.fromDate;
-        const toDate = query.toDate;
+        const fromDate = query.from || query.fromDate;
+        const toDate = query.to || query.toDate;
         const searchQuery = query.search;
+        const dateFilter = query.filter || (fromDate || toDate ? 'custom' : '7days');
         const auditLogs = AppLogger.getStructuredAudits(currentTenant?.siteKey || selectedClient, dateFilter, searchQuery);
         const dailyRecords = UsageTracker.getTenantDailyRecords(currentTenant?.siteKey || selectedClient, fromDate, toDate);
         const html = AdminView.renderDashboard({
