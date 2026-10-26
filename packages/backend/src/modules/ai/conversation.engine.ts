@@ -491,13 +491,30 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
     // High-Precision Product Matching: Respects exact compound, dosage & budget
     const relevantCards = this.matchProductsPrecisely(storeProducts, message, replyText, budgetNum);
 
-    // Extra safety: If relevantCards is empty BUT user asked for products/catalog or AI listed products:
+    // Extra safety: If relevantCards is empty BUT user asked for products/catalog or AI reply presented catalog:
     let finalCards = relevantCards;
     if (finalCards.length === 0) {
-      const isCatalogAsk = /\b(product|products|catalog|items|inventory|what (do you|do u|are you) (sell|have)|apke (paas|pas)|kya kya|dikhao|sell (akrhay|kar rahe|rahy|karty)|khareedna|buy|buty)\b/i.test(messageLower);
       const isRefusal = replyLower.includes('ijazat nahi') || replyLower.includes('not authorized');
-      const isPolicy = /\b(shipping|delivery|dispatch|refund|policy|policies)\b/i.test(messageLower) && !/\b(product|products|catalog|tirz|semaglutide|water)\b/i.test(messageLower);
-      if (isCatalogAsk && !isRefusal && !isPolicy) {
+      const isPolicy = /\b(shipping|delivery|dispatch|refund|policy|policies)\b/i.test(messageLower) && !/\b(product|products|catalog|tirz|semaglutide|water|khareed|khared|buy|order)\b/i.test(messageLower);
+      
+      // If AI reply literally talks about the catalog or mentions Add to Cart or mentions multiple products:
+      const aiReplyOffersCatalog = replyLower.includes('catalog') || 
+                                   replyLower.includes('add to cart') || 
+                                   replyLower.includes('dastyab') ||
+                                   replyLower.includes('neeche') ||
+                                   replyLower.includes('below') ||
+                                   replyLower.includes('cart mein') ||
+                                   (replyLower.includes('tirz') && replyLower.includes('semaglutide')) ||
+                                   (replyLower.includes('bacteriostatic') && replyLower.includes('retatrutide'));
+
+      const userAskedForProducts = 
+        /\b(product|products|catalog|item|items|inventory|stock|all|sab)\b/i.test(messageLower) ||
+        /\b(buy|order|purchase|khareed|khared|kharid|lena|mangwana|chahta|chahiye|khareedna|kharedna)\b/i.test(messageLower) ||
+        /\b(what (do you|do u|are you) (sell|have)|apke|aapke|tumharay|tumhare|tere|teray)\s*(paas|pas|apas)?\b/i.test(messageLower) ||
+        /\b(kya kya|kia kai|kia kia|kya kia|kia kya|kya hai|kia hai|kia he|kya he)\b/i.test(messageLower) ||
+        /\b(dikhao|batao|dekhein|dekhna|sell|bechtay|dastyab)\b/i.test(messageLower);
+
+      if ((aiReplyOffersCatalog || userAskedForProducts) && !isRefusal && !isPolicy) {
         finalCards = storeProducts;
       }
     }
@@ -563,7 +580,7 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
     const isPleasantry = /^(ok|okay|theek|thik|achha|acha|thanks|thank you|shukriya|jazakallah|bye|goodbye|tc|cya|alvida)[\s!.,?]*$/i.test(msgLower);
     
     // Check if user specifically requested products in this message
-    const hasShoppingIntent = /\b(product|products|item|items|catalog|buy|order|price|cost|stock|available|dose|dosage|mg|diluent|peptides?|compounds?|semaglutide|tirz|retatrutide|water|bacteriostatic|dikhao|batao|chahiye|khareedna|mangwana|kya hai|kitnay|kitna)\b/i.test(msgLower);
+    const hasShoppingIntent = /\b(product|products|item|items|catalog|buy|order|price|cost|stock|available|dose|dosage|mg|diluent|peptides?|compounds?|semaglutide|tirz|retatrutide|water|bacteriostatic|dikhao|batao|chahiye|khareedna|kharedna|kharidna|khareed|khared|mangwana|kya hai|kia hai|kia kai|kya kya|kitnay|kitna|chahta|lena|tumharay|tumhare)\b/i.test(msgLower);
 
     if ((isPureGreeting || isPleasantry) && !hasShoppingIntent) {
       return [];
@@ -575,9 +592,10 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
       /\b(see (your )?products?|se (your )?products?|view products?|show (me )?(your )?(all )?products?|list (of )?products?)\b/i.test(msgLower) ||
       /\b(what (do you|do u|are you) (sell|have|offer)|which products? (do you|do u) have|what is in (your )?catalog|what can (i|we) buy)\b/i.test(msgLower) ||
       /\b(kya (kya )?(sell|bechtay|rakhtay|available|dastyab) (hai|hain|karo|karte ho|karty ho|kar rahe ho|kar rahy ho))\b/i.test(msgLower) ||
-      /\b(apke|aapke|aap ke|ap ke)\s*(paas|pas)\s*(kya|kon kon say|kaun kaun se|kya kya)\s*(products?|items?|hai|hain)\b/i.test(msgLower) ||
+      /\b(apke|aapke|aap ke|ap ke|tumharay|tumhare|tere|teray)\s*(paas|pas|apas)?\s*(kya|kia|kon|kaun|kia kai|kya kya)?\s*(products?|items?|hai|hain|he)?\b/i.test(msgLower) ||
       /\b(products? (dikhao|batao|dekhein|dekhna|list karo|check karne))\b/i.test(msgLower) ||
-      (/\b(mujhay|mujh ko|i want to|want to)\s*(buy|buty|by|bui|khareedna|order karna)\b/i.test(msgLower) && !/\b(semaglutide|tirz|retatrutide|bacteriostatic|water|\d+\s*mg)\b/i.test(msgLower));
+      /\b(khareedna|kharedna|kharidna|khareed|khared|chahta|chahiye)\b.*\b(kya|kia|tumharay|tumhare|apke|aapke|kuch|kcuh)\b/i.test(msgLower) ||
+      (/\b(mujhay|mujh ko|i want to|want to|mai|main)\s*(buy|buty|by|bui|khareedna|kharedna|kharidna|order karna|order|lena)\b/i.test(msgLower) && !/\b(semaglutide|tirz|retatrutide|bacteriostatic|water|\d+\s*mg)\b/i.test(msgLower));
 
     if (isGeneralCatalogRequest) {
       return storeProducts;
