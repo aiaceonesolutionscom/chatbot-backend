@@ -227,8 +227,10 @@ class UniversalAICommerceChatbot {
         $site_key = get_option('uac_chatbot_site_key', 'colbolt_live');
         $api_url  = rtrim(get_option('uac_chatbot_api_url', 'https://api.hawksnfox.com'), '/');
         $widget_file = plugin_dir_path(__FILE__) . 'assets/widget.js';
-        $ver = file_exists($widget_file) ? filemtime($widget_file) : '1.1.0';
-        $plugin_widget_url = plugins_url('assets/widget.js', __FILE__) . '?ver=' . $ver;
+        $ver = file_exists($widget_file) ? filemtime($widget_file) : time();
+        
+        // Load live widget directly from the centralized API server with automatic cache-busting
+        $plugin_widget_url = $api_url . '/widget.js?v=' . $ver;
 
         // Generate Store API Nonce for authenticated session cart writes
         $nonce = wp_create_nonce('wc_store_api');
