@@ -52,6 +52,7 @@ export class ConversationEngine {
    * Tracks the most recently discussed or viewed product per session for contextual commands ("khud add kardo", "afd akrdoo", etc.)
    */
   public static sessionLastProduct: Map<string, NormalizedProduct> = new Map();
+  private static groqAuthFailed: boolean = false;
 
   public static getSessionCart(conversationId: string): SessionCartItem[] {
     return this.sessionCarts.get(conversationId) || [];
@@ -1722,7 +1723,7 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
     let replyText: string | null = null;
 
     // 1. PRIMARY AI: GROQ CLOUD (14,400 Free Requests/Day, ~250ms ultra-low latency)
-    if (groqApiKey && groqApiKey.startsWith('gsk_')) {
+    if (groqApiKey && groqApiKey.startsWith('gsk_') && !this.groqAuthFailed) {
       const groqModels = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b'];
       for (const gm of groqModels) {
         if (replyText) break;
@@ -1753,6 +1754,10 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
             }
           } else {
             console.warn(`[Groq] Model ${gm} HTTP ${res.status}`);
+            if (res.status === 401) {
+              this.groqAuthFailed = true;
+              break;
+            }
           }
         } catch (e: any) {
           clearTimeout(timeoutId);
