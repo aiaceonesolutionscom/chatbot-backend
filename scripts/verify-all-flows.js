@@ -384,9 +384,75 @@ async function runTestSuite() {
   });
   assert(res.message.includes('replace') || res.message.includes('strength') || res.message.includes('badalna chahte'), 'Asks human-like clarification for vague swap');
 
+  // TEST 29: Multi-Product Add ("tirz 30 mg or tirz 10 mg yh add akroo")
+  console.log('\n--- Step 29: Multi-Product Add ("tirz 30 mg or tirz 10 mg yh add akroo") ---');
+  const convIdMulti = `test_conv_multi_${Date.now()}`;
+  res = await ConversationEngine.processMessage({
+    conversationId: convIdMulti,
+    message: 'tirz 30 mg or tirz 10 mg yh add akroo',
+    tenant
+  });
+  let multiCart = ConversationEngine.getSessionCart(convIdMulti);
+  assert(multiCart.length === 2, 'Both Tirz 30mg and Tirz 10mg added to cart in one turn');
+  assert(multiCart.some(i => i.title.includes('30mg')) && multiCart.some(i => i.title.includes('10mg')), 'Both 30mg and 10mg exist in cart');
+  assert(res.cartAction && res.cartAction.type === 'add', 'Cart action emitted for multi-item add');
+
+  // TEST 30: Typo Quantity Update ("trirz 30 mg ki qty 2 kardo")
+  console.log('\n--- Step 30: Typo Quantity Update ("trirz 30 mg ki qty 2 kardo") ---');
+  res = await ConversationEngine.processMessage({
+    conversationId: convIdMulti,
+    message: 'trirz 30 mg ki qty 2 kardo',
+    tenant
+  });
+  multiCart = ConversationEngine.getSessionCart(convIdMulti);
+  const t30 = multiCart.find(i => i.title.includes('30mg'));
+  const t10 = multiCart.find(i => i.title.includes('10mg'));
+  assert(t30 && t30.quantity === 2, 'Tirz 30mg quantity updated to 2x despite typo "trirz"');
+  assert(t10 && t10.quantity === 1, 'Tirz 10mg quantity preserved safely at 1x');
+  assert(res.cartAction && res.cartAction.type === 'update', 'Cart action update emitted for Tirz 30mg');
+
+  // TEST 31: Past Tense Quantity Correction ("irz 30 mg ki barhani thee")
+  console.log('\n--- Step 31: Past Tense Quantity Correction ("irz 30 mg ki barhani thee") ---');
+  res = await ConversationEngine.processMessage({
+    conversationId: convIdMulti,
+    message: 'irz 30 mg ki barhani thee',
+    tenant
+  });
+  multiCart = ConversationEngine.getSessionCart(convIdMulti);
+  const t30After = multiCart.find(i => i.title.includes('30mg'));
+  assert(t30After && t30After.quantity >= 2, 'Understood past tense intent "barhani thee" for Tirz 30mg');
+  assert(res.cartAction && res.cartAction.type === 'update', 'Emitted real cart update action without hallucination');
+
+  // TEST 32: Compound Remove + Budget Add ("acha tirz 30 mg hata do or 15 dollar ka kuch add akroo kia hai tumharay apas 15 dollar ka")
+  console.log('\n--- Step 32: Compound Remove + Budget Add ("acha tirz 30 mg hata do or 15 dollar ka kuch add akroo kia hai tumharay apas 15 dollar ka") ---');
+  res = await ConversationEngine.processMessage({
+    conversationId: convIdMulti,
+    message: 'acha tirz 30 mg hata do or 15 dollar ka kuch add akroo kia hai tumharay apas 15 dollar ka',
+    tenant
+  });
+  multiCart = ConversationEngine.getSessionCart(convIdMulti);
+  const hasRemoved30 = !multiCart.some(i => i.title.includes('30mg'));
+  const hasWater = multiCart.some(i => i.title.toLowerCase().includes('water'));
+  const hasStill10 = multiCart.some(i => i.title.includes('10mg'));
+  assert(hasRemoved30, 'Tirz 30mg was removed from cart');
+  assert(hasWater, 'Bacteriostatic Water ($15) was added within $15 budget');
+  assert(hasStill10, 'Tirz 10mg remained safely in cart and was NOT emptied');
+
+  // TEST 33: Add with Explicit Quantity ("semaglutide 10 mg yh add akro qty 2")
+  console.log('\n--- Step 33: Add with Explicit Quantity ("semaglutide 10 mg yh add akro qty 2") ---');
+  res = await ConversationEngine.processMessage({
+    conversationId: convIdMulti,
+    message: 'semaglutide 10 mg yh add akro qty 2',
+    tenant
+  });
+  multiCart = ConversationEngine.getSessionCart(convIdMulti);
+  const semaItem = multiCart.find(i => i.title.toLowerCase().includes('sema') && i.title.includes('10mg'));
+  assert(semaItem && semaItem.quantity === 2, 'Semaglutide 10mg added with quantity 2x without being hijacked by SET_QTY');
+  assert(res.cartAction && res.cartAction.type === 'add', 'Emitted cart action add for Semaglutide');
+
   console.log('\n================================================================');
   if (allPassed) {
-    console.log('🎉 ALL 28 VERIFICATION TESTS PASSED WITH 100% ACCURACY!');
+    console.log('🎉 ALL 33 VERIFICATION TESTS PASSED WITH 100% ACCURACY!');
   } else {
     console.error('❌ SOME TESTS FAILED. PLEASE REVIEW OUTPUT ABOVE.');
   }

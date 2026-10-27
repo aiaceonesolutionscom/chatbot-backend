@@ -71,7 +71,22 @@ export class ConversationEngine {
   public static setSessionCartQuantity(conversationId: string, itemKeyOrTitle: string, quantity: number): void {
     const list = this.sessionCarts.get(conversationId) || [];
     const term = itemKeyOrTitle.toLowerCase().trim();
-    const existing = list.find(x => x.id === term || x.title.toLowerCase().includes(term));
+    const termNorm = term.replace(/\s+/g, '');
+    const termDoseMatch = termNorm.match(/(\d+)(?:mg|m)/);
+    const termDose = termDoseMatch ? `${termDoseMatch[1]}mg` : '';
+
+    const existing = list.find(x => {
+      const xId = (x.id || '').toLowerCase();
+      const xTitle = (x.title || '').toLowerCase();
+      const xTitleNorm = xTitle.replace(/\s+/g, '');
+
+      if (xId === term) return true;
+      if (xTitle === term || xTitleNorm === termNorm) return true;
+      if (termDose && !xTitleNorm.includes(termDose)) return false;
+      if (xTitle.includes(term) || term.includes(xTitle)) return true;
+      return false;
+    });
+
     if (existing) {
       existing.quantity = quantity;
     }
@@ -81,11 +96,29 @@ export class ConversationEngine {
   public static removeFromSessionCart(conversationId: string, itemKeyOrTitle: string): SessionCartItem | undefined {
     const list = this.sessionCarts.get(conversationId) || [];
     const term = itemKeyOrTitle.toLowerCase().trim();
-    const index = list.findIndex(x => 
-      x.id === term || 
-      x.title.toLowerCase().includes(term) ||
-      term.includes(x.title.toLowerCase().split(/\s+/)[0])
-    );
+    const termNorm = term.replace(/\s+/g, '');
+    const termDoseMatch = termNorm.match(/(\d+)(?:mg|m)/);
+    const termDose = termDoseMatch ? `${termDoseMatch[1]}mg` : '';
+
+    const index = list.findIndex(x => {
+      const xId = (x.id || '').toLowerCase();
+      const xTitle = (x.title || '').toLowerCase();
+      const xTitleNorm = xTitle.replace(/\s+/g, '');
+
+      // 1. Exact ID match
+      if (xId === term) return true;
+
+      // 2. Exact Title match
+      if (xTitle === term || xTitleNorm === termNorm) return true;
+
+      // 3. Strict dosage guard: if term has a dosage (e.g. 30mg), item MUST match that exact dosage!
+      if (termDose && !xTitleNorm.includes(termDose)) return false;
+
+      // 4. Safe substring match ONLY if candidate matches dosage
+      if (xTitle.includes(term) || term.includes(xTitle)) return true;
+
+      return false;
+    });
     if (index !== -1) {
       const [removed] = list.splice(index, 1);
       this.sessionCarts.set(conversationId, list);
@@ -106,7 +139,7 @@ export class ConversationEngine {
 
   /**
    * Resolves exact product and dosage from customer message with 100% precision.
-   * Prevents matching "Tirz 60mg" when user asked for "Tirz 10mg", etc.
+   * Tolerant of phonetic spelling, typos ("trirz", "irz", "semaglutude", "bacteriostic"), and dosage omission.
    */
   public static resolveProductFromMessage(
     msg: string, 
@@ -134,15 +167,15 @@ export class ConversationEngine {
       : (dosageMatches.length > 0 ? dosageMatches[0] : null);
     const dosage = chosenDosageMatch ? `${chosenDosageMatch[1]}mg` : '';
 
-    // 2. Identify compound
+    // 2. Identify compound with typo tolerance (trirz, irz, triz, semaglutude, etc.)
     let compound = '';
-    if (/\btirz/i.test(msgLower)) compound = 'tirz';
-    else if (/\bsema/i.test(msgLower)) compound = 'sema';
-    else if (/\breta/i.test(msgLower)) compound = 'reta';
-    else if (/\bwater\b/i.test(msgLower) || /\bbacteriostatic\b/i.test(msgLower)) compound = 'water';
+    if (/\b(tirz|trirz|triz|tirze|irz|tirzepatide)\b/i.test(msgLower) || /t+r*i+r*z+/i.test(msgLower)) compound = 'tirz';
+    else if (/\b(sema|semaglutide|semaglutude|semaglutid|samaglutide)\b/i.test(msgLower) || /s+e+m+a+/i.test(msgLower)) compound = 'sema';
+    else if (/\b(reta|retatrutide|retatrutid|ratatrutide)\b/i.test(msgLower) || /r+e+t+a+/i.test(msgLower)) compound = 'reta';
+    else if (/\b(water|bacteriostatic|bacteriostic|bac\s*water)\b/i.test(msgLower)) compound = 'water';
     else if (contextProduct) {
       const ctxTitle = contextProduct.title.toLowerCase();
-      if (ctxTitle.includes('tirz')) compound = 'tirz';
+      if (ctxTitle.includes('tirz') || ctxTitle.includes('trirz') || ctxTitle.includes('irz')) compound = 'tirz';
       else if (ctxTitle.includes('sema')) compound = 'sema';
       else if (ctxTitle.includes('reta')) compound = 'reta';
       else if (ctxTitle.includes('water')) compound = 'water';
@@ -164,7 +197,7 @@ export class ConversationEngine {
     }
 
     // 5. If compound is explicitly specified in the message
-    const compoundExplicitInMsg = /\b(tirz|sema|reta|water|bacteriostatic)\b/i.test(msgLower);
+    const compoundExplicitInMsg = /\b(tirz|trirz|triz|irz|sema|semaglutide|semaglutude|reta|retatrutide|water|bacteriostatic|bacteriostic)\b/i.test(msgLower);
     if (compoundExplicitInMsg) {
       if (compound === 'water') {
         return storeProducts.find(p => p.title.toLowerCase().includes('water'));
@@ -181,6 +214,47 @@ export class ConversationEngine {
 
     // 6. Direct title substring
     return storeProducts.find(p => msgLower.includes(p.title.toLowerCase()));
+  }
+
+  /**
+   * Resolves multiple distinct products mentioned in a customer message.
+   * E.g. "tirz 30 mg or tirz 10 mg yh add akroo" -> [Tirz 30mg, Tirz 10mg]
+   */
+  public static resolveAllProductsFromMessage(
+    msg: string,
+    storeProducts: NormalizedProduct[]
+  ): NormalizedProduct[] {
+    const msgLower = (msg || '').toLowerCase();
+    const parts = msgLower.split(/\b(?:or|aur|and|\+|&)\b|,/gi).map(s => s.trim()).filter(s => s.length > 0);
+    
+    const results: NormalizedProduct[] = [];
+    const seenIds = new Set<string>();
+
+    for (const part of parts) {
+      const prod = ConversationEngine.resolveProductFromMessage(part, storeProducts);
+      if (prod && !seenIds.has(prod.id)) {
+        seenIds.add(prod.id);
+        results.push(prod);
+      }
+    }
+
+    if (results.length > 1) {
+      return results;
+    }
+
+    const dosageMatches = [...msgLower.matchAll(/\b(\d+)\s*(?:mg|m)\b/gi)];
+    if (dosageMatches.length > 1) {
+      for (const dm of dosageMatches) {
+        const dStr = `${dm[1]}mg`;
+        const prod = storeProducts.find(p => p.title.toLowerCase().replace(/\s+/g, '').includes(dStr));
+        if (prod && !seenIds.has(prod.id)) {
+          seenIds.add(prod.id);
+          results.push(prod);
+        }
+      }
+    }
+
+    return results;
   }
 
   /**
@@ -257,12 +331,16 @@ export class ConversationEngine {
     }
 
     // 6. SET / INCREASE QUANTITY INTENT (Must be before SWAP)
-    // Matches: "quantity 3 kardo iskii", "likn quantity 1 rakhoo", "tirz ki quantity 2 kar do", "3 bottles kardo", "do kar do", "barha do quantity"
+    // Matches: "quantity 3 kardo iskii", "likn quantity 1 rakhoo", "tirz ki quantity 2 kar do", "trirz 30 mg ki qty 2 kardo", "irz 30 mg ki barhani thee", "barha do quantity"
     const isExplicitQtyWord = /\b(quantity|qty|miqdaar|taadad)\b/i.test(msgLower);
-    const isIncreaseWord = /\b(barha|barhao|barhana|increase|plus|double|triple|ek\s*aur|aik\s*aur|one\s*more|add\s*more)\b/i.test(msgLower);
+    const isIncreaseWord = /\b(barha|barhao|barhana|barhani|barhana\s*tha|barhani\s*thi|barhani\s*thee|badha|badhao|badhana|increase|plus|double|triple|ek\s*aur|aik\s*aur|one\s*more|add\s*more)\b/i.test(msgLower);
     const isSetWord = /\b(rakho|rakhoo|kardo|kar\s*do|karna|set|make|update)\b/i.test(msgLower);
     const isSwapComparison = /\b(\d+)\s*(?:nahi|not|mat)\s*(\d+)/i.test(msgLower);
-    const isQuantityIntent = !isSwapComparison && (
+    const isAddWordInMsg = /\b(add|dalo|daal|daalo|shamil|pack|kharidna|khareedna|mangwana|order\s*karo|basket\s*mai|khud\s*akrdo|a[fd]+)\b/i.test(msgLower);
+
+    // If message is an explicit ADD command for a product (e.g. "semaglutide 10 mg yh add akro qty 2"),
+    // it MUST NOT be intercepted as SET_QTY!
+    const isQuantityIntent = !isSwapComparison && !isAddWordInMsg && (
       (isExplicitQtyWord && (qtyMatch || isIncreaseWord || isSetWord)) ||
       (isIncreaseWord && (sessionItems.length > 0 || targetProduct || /\b(product|item|yeh|ye|woh|wo)\b/i.test(msgLower))) ||
       (qtyMatch && isSetWord && /\b(quantity|qty|rakh|kard)\b/i.test(msgLower)) ||
@@ -528,6 +606,175 @@ export class ConversationEngine {
     const qtyMatch = cleanForQty.match(/\b([1-9]|10)\s*(x|pieces?|vials?|bottles?)?\b/i);
     const parsedQty = semanticIntent.quantity || (qtyMatch ? parseInt(qtyMatch[1], 10) : 1);
 
+    // 2A_COMPOUND. COMPOUND INTENT: REMOVE ONE ITEM & ADD ANOTHER / BUDGET ITEM
+    // E.g. "acha tirz 30 mg hata do or 15 dollar ka kuch add akroo kia hai tumharay apas 15 dollar ka"
+    // E.g. "tirz 30 hata do aur semaglutide 10 add kardo"
+    const hasRemoveVerb = /\b(hata|hatao|remove|nikaal|nikal|drop|chhor|chhoro|discard)\b/i.test(msgLower);
+    const hasAddOrBudgetVerb = /\b(aur|or|and|\+)\b.*\b(add|dalo|daal|shamil|lena|dedo|bhejo|dollar|\$|budget)\b/i.test(msgLower);
+
+    if (hasRemoveVerb && hasAddOrBudgetVerb && currentSessionItems.length > 0) {
+      const parts = msgLower.split(/\b(?:aur|or|and|\+)\b/i);
+      const removePart = parts.find(p => /\b(hata|remove|nikaal|nikal|drop|chhor)\b/i.test(p)) || parts[0];
+      const addPart = parts.find(p => p !== removePart) || parts[1] || '';
+
+      // 1. Resolve item to remove
+      let itemToRemoveCandidate = ConversationEngine.resolveProductFromMessage(removePart, storeProducts);
+      let removedItem: SessionCartItem | undefined;
+
+      if (!itemToRemoveCandidate) {
+        const remDoseMatch = removePart.match(/\b(\d+)\s*(?:mg|m)\b/i) || removePart.match(/\b(60|30|10|5)\b/i);
+        if (remDoseMatch) {
+          const doseStr = `${remDoseMatch[1]}mg`;
+          const matchCart = currentSessionItems.find(it => it.title.toLowerCase().replace(/\s+/g, '').includes(doseStr));
+          if (matchCart) {
+            itemToRemoveCandidate = storeProducts.find(p => p.id === matchCart.id);
+          }
+        }
+      }
+
+      if (itemToRemoveCandidate) {
+        removedItem = ConversationEngine.removeFromSessionCart(conversationId, itemToRemoveCandidate.id);
+        if (adapter.removeFromCart) {
+          adapter.removeFromCart(itemToRemoveCandidate.id, { shopperSessionId: input.shopperSessionId }).catch(() => {});
+        }
+      }
+
+      // 2. Resolve item to add (by product name or budget)
+      let itemToAddCandidate = ConversationEngine.resolveProductFromMessage(addPart, storeProducts);
+      let budgetNotice = '';
+
+      if (!itemToAddCandidate) {
+        const bMatch = msgLower.match(/(\d+)\s*(?:dollar|\$|usd)/i);
+        if (bMatch) {
+          const bVal = parseInt(bMatch[1], 10);
+          const budgetFits = storeProducts
+            .filter(p => p.price.regular <= bVal)
+            .sort((a, b) => b.price.regular - a.price.regular);
+          if (budgetFits.length > 0) {
+            itemToAddCandidate = budgetFits[0];
+            budgetNotice = isUrduLang
+              ? `Aapke **$${bVal}** budget ke mutabiq **${itemToAddCandidate.title}** ($${itemToAddCandidate.price.regular.toFixed(2)}) sab se behtareen match hai!`
+              : `Based on your **$${bVal}** budget, **${itemToAddCandidate.title}** ($${itemToAddCandidate.price.regular.toFixed(2)}) is the perfect fit!`;
+          }
+        }
+      }
+
+      if (itemToAddCandidate) {
+        ConversationEngine.addToSessionCart(conversationId, {
+          id: itemToAddCandidate.id,
+          title: itemToAddCandidate.title,
+          price: itemToAddCandidate.price.regular,
+          quantity: 1
+        });
+        if (adapter.addToCart) {
+          adapter.addToCart(itemToAddCandidate.id, undefined, 1, { shopperSessionId: input.shopperSessionId }).catch(() => {});
+        }
+      }
+
+      const sessionItems = ConversationEngine.getSessionCart(conversationId);
+      const subtotal = sessionItems.reduce((acc, it) => acc + (it.price * it.quantity), 0);
+      const remTitle = removedItem ? removedItem.title : (itemToRemoveCandidate ? itemToRemoveCandidate.title : 'Item');
+
+      let cartListing = '';
+      if (sessionItems.length > 0) {
+        cartListing = '\n\n🛒 **Aapke Cart Mein Maujood Products**:\n' +
+          sessionItems.map(it => `• **${it.title}** (${it.quantity}x) — $${(it.price * it.quantity).toFixed(2)}`).join('\n') +
+          `\n💵 **Updated Total**: $${subtotal.toFixed(2)}\n\n🔗 [View Full Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)`;
+      } else {
+        cartListing = '\n\nAapka cart ab khali hai.';
+      }
+
+      const msg = isUrduLang
+        ? `✅ **${remTitle}** cart se remove kar diya gaya hai.\n` +
+          (itemToAddCandidate ? `✅ **${itemToAddCandidate.title}** (1x) aapke cart mein **ADD** kar diya gaya hai!\n${budgetNotice}` : '') +
+          cartListing
+        : `✅ **${remTitle}** has been removed from your cart.\n` +
+          (itemToAddCandidate ? `✅ **${itemToAddCandidate.title}** (1x) has been successfully ADDED to your cart!\n${budgetNotice}` : '') +
+          cartListing;
+
+      const response: ChatResponse = {
+        conversationId,
+        role: 'assistant',
+        message: msg,
+        productCards: itemToAddCandidate ? [itemToAddCandidate] : undefined,
+        cartAction: itemToAddCandidate ? {
+          type: 'add',
+          item: {
+            id: itemToAddCandidate.id,
+            title: itemToAddCandidate.title,
+            price: itemToAddCandidate.price.regular,
+            quantity: 1
+          }
+        } : (removedItem ? {
+          type: 'remove',
+          productId: removedItem.id,
+          title: removedItem.title
+        } : undefined),
+        quickReplies: [
+          { label: 'View Full Cart', actionText: 'Show my cart' },
+          { label: 'Proceed to Checkout', actionText: 'Proceed to checkout' },
+          { label: 'Show All Products', actionText: 'Show all products' }
+        ]
+      };
+      this.recordTurn(conversationId, trimmedMessage, msg);
+      return response;
+    }
+
+    // 2A3_MULTI. MULTI-PRODUCT ADD TO CART HANDLER
+    // E.g. "tirz 30 mg or tirz 10 mg yh add akroo", "tirz 10mg aur water dono add kardo"
+    const allProductsToAdd = ConversationEngine.resolveAllProductsFromMessage(msgLower, storeProducts);
+    const hasAddVerbInMsg = /\b(add|dalo|daal|daalo|shamil|pack|bhejo|de\s*do|dedo|lena|mangwana|khareedna|kharidna|order|basket)\b/i.test(msgLower);
+
+    if (allProductsToAdd.length > 1 && hasAddVerbInMsg) {
+      for (const prod of allProductsToAdd) {
+        const item: SessionCartItem = {
+          id: prod.id,
+          title: prod.title,
+          price: prod.price.regular,
+          quantity: 1
+        };
+        ConversationEngine.addToSessionCart(conversationId, item);
+        if (adapter.addToCart) {
+          adapter.addToCart(prod.id, undefined, 1, { shopperSessionId: input.shopperSessionId }).catch(() => {});
+        }
+      }
+
+      const sessionItems = ConversationEngine.getSessionCart(conversationId);
+      const subtotal = sessionItems.reduce((acc, it) => acc + (it.price * it.quantity), 0);
+      const itemsList = allProductsToAdd.map(p => `• **${p.title}** (1x) — $${p.price.regular.toFixed(2)}`).join('\n');
+
+      const msg = isUrduLang
+        ? `✅ **Tamam products kamyabi se aapke cart mein ADD kar diye gaye hain**:\n${itemsList}\n\n` +
+          `💵 **Estimated Subtotal**: $${subtotal.toFixed(2)}\n\n` +
+          `🔗 [View Full Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)`
+        : `✅ **The following items have been successfully ADDED to your cart**:\n${itemsList}\n\n` +
+          `💵 **Estimated Subtotal**: $${subtotal.toFixed(2)}\n\n` +
+          `🔗 [View Full Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)`;
+
+      const response: ChatResponse = {
+        conversationId,
+        role: 'assistant',
+        message: msg,
+        productCards: allProductsToAdd,
+        cartAction: {
+          type: 'add',
+          item: {
+            id: allProductsToAdd[0].id,
+            title: allProductsToAdd[0].title,
+            price: allProductsToAdd[0].price.regular,
+            quantity: 1
+          }
+        },
+        quickReplies: [
+          { label: 'Proceed to Checkout', actionText: 'Proceed to checkout' },
+          { label: 'View Full Cart', actionText: 'Show my cart' },
+          { label: 'Empty Cart', actionText: 'Clear cart' }
+        ]
+      };
+      this.recordTurn(conversationId, trimmedMessage, msg);
+      return response;
+    }
+
     // 2A0. SWAP / REPLACE COMPOUND HANDLER
     // Matches ANY natural phrasing of swap/replace:
     // "tirz 60 mg update kardo 10 mg akrdoo", "60 nahi 10 chahiye", "galti se 60 agya 10 karna tha", "60 ki jagah 10 kardo", "10mg wala bhej do 60 hata do"
@@ -716,8 +963,17 @@ export class ConversationEngine {
     if (isExplicitUncart) {
       const sessionItems = ConversationEngine.getSessionCart(conversationId);
       let targetItem = semanticIntent.targetProduct
-        ? sessionItems.find(it => it.id === semanticIntent.targetProduct!.id)
+        ? sessionItems.find(it => it.id === semanticIntent.targetProduct!.id || it.title.toLowerCase().replace(/\s+/g, '') === semanticIntent.targetProduct!.title.toLowerCase().replace(/\s+/g, ''))
         : undefined;
+
+      // Dosage and compound-aware matching in cart
+      if (!targetItem) {
+        const dosageMatch = msgLower.match(/\b(\d+)\s*(?:mg|m)\b/i) || msgLower.match(/\b(60|30|10|5)\b/i);
+        const doseStr = dosageMatch ? `${dosageMatch[1]}mg` : '';
+        if (doseStr) {
+          targetItem = sessionItems.find(it => it.title.toLowerCase().replace(/\s+/g, '').includes(doseStr));
+        }
+      }
 
       if (!targetItem) {
         targetItem = sessionItems.find(it => {
@@ -725,14 +981,6 @@ export class ConversationEngine {
           const firstWord = titleLower.split(/\s+/)[0];
           return msgLower.includes(titleLower) || msgLower.includes(firstWord);
         });
-      }
-
-      // Match dosage if present in message (e.g. 60mg, 60m, 10mg)
-      const dosageMatch = msgLower.match(/\b(\d+)\s*(?:mg|m)\b/i);
-      if (dosageMatch) {
-        const dosageStr = `${dosageMatch[1]}mg`;
-        const doseSpecific = sessionItems.find(it => it.title.toLowerCase().replace(/\s+/, '').includes(dosageStr));
-        if (doseSpecific) targetItem = doseSpecific;
       }
 
       let title = 'Selected Item';
@@ -749,7 +997,6 @@ export class ConversationEngine {
       }
 
       ConversationEngine.removeFromSessionCart(conversationId, targetId);
-      ConversationEngine.removeFromSessionCart(conversationId, title);
 
       if (adapter.removeFromCart) {
         adapter.removeFromCart(targetId, { shopperSessionId: input.shopperSessionId }).catch(() => {});
@@ -802,11 +1049,43 @@ export class ConversationEngine {
 
     if (isQuantityIntent) {
       const sessionItems = ConversationEngine.getSessionCart(conversationId);
-      let targetItem = sessionItems.find(it => {
-        const titleLower = it.title.toLowerCase();
-        const firstWord = titleLower.split(/\s+/)[0];
-        return msgLower.includes(titleLower) || msgLower.includes(firstWord);
-      });
+      
+      // 1. If semanticIntent identified a targetProduct that is in the cart, prioritize it
+      let targetItem = semanticIntent.targetProduct
+        ? sessionItems.find(it => it.id === semanticIntent.targetProduct!.id || it.title.toLowerCase().replace(/\s+/g, '') === semanticIntent.targetProduct!.title.toLowerCase().replace(/\s+/g, ''))
+        : undefined;
+
+      // 2. Dosage and compound-aware matching in cart (e.g. "trirz 30 mg", "irz 30 mg")
+      if (!targetItem) {
+        const dosageMatch = msgLower.match(/\b(\d+)\s*(?:mg|m)\b/i) || msgLower.match(/\b(60|30|10|5)\b/i);
+        const doseStr = dosageMatch ? `${dosageMatch[1]}mg` : '';
+
+        let compoundMatch = '';
+        if (/\b(tirz|trirz|triz|irz)\b/i.test(msgLower)) compoundMatch = 'tirz';
+        else if (/\b(sema|semaglutide|semaglutude)\b/i.test(msgLower)) compoundMatch = 'sema';
+        else if (/\b(reta|retatrutide)\b/i.test(msgLower)) compoundMatch = 'reta';
+        else if (/\b(water|bacteriostatic)\b/i.test(msgLower)) compoundMatch = 'water';
+
+        if (doseStr && compoundMatch) {
+          targetItem = sessionItems.find(it => {
+            const tNorm = it.title.toLowerCase().replace(/\s+/g, '');
+            return tNorm.includes(compoundMatch) && tNorm.includes(doseStr);
+          });
+        }
+        if (!targetItem && doseStr) {
+          targetItem = sessionItems.find(it => it.title.toLowerCase().replace(/\s+/g, '').includes(doseStr));
+        }
+        if (!targetItem && compoundMatch) {
+          targetItem = sessionItems.find(it => it.title.toLowerCase().includes(compoundMatch));
+        }
+      }
+
+      if (!targetItem) {
+        targetItem = sessionItems.find(it => {
+          const titleLower = it.title.toLowerCase();
+          return msgLower.includes(titleLower);
+        });
+      }
 
       if (!targetItem && sessionItems.length > 0) {
         targetItem = sessionItems[sessionItems.length - 1];
@@ -818,6 +1097,10 @@ export class ConversationEngine {
           newQty = parsedQty;
         } else if (/\bdouble\b/i.test(msgLower)) {
           newQty = targetItem.quantity * 2;
+        } else if (/\btriple\b/i.test(msgLower)) {
+          newQty = targetItem.quantity * 3;
+        } else if (/\b(barha\w*|badha\w*|plus|aur|more)\b/i.test(msgLower)) {
+          newQty = targetItem.quantity + 1;
         }
 
         targetItem.quantity = newQty;
@@ -1549,41 +1832,51 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
       }
     }
 
-    // Process machine-readable <cart_action> if emitted by AI
-    const cartActionMatch = replyText.match(/<cart_action\s+action=["']([^"']+)["'](?:\s+product=["']([^"']+)["'])?(?:\s+quantity=["']?(\d+)["']?)?\s*\/?>/i);
+    // Process machine-readable <cart_action> tags emitted by AI (supports multi-step sequential actions)
+    const cartActionMatches = [...replyText.matchAll(/<cart_action\s+action=["']([^"']+)["'](?:\s+product=["']([^"']+)["'])?(?:\s+quantity=["']?(\d+)["']?)?\s*\/?>/gi)];
     let aiCartAction: ChatResponse['cartAction'] = undefined;
-    if (cartActionMatch) {
-      const actionType = cartActionMatch[1].toLowerCase();
-      const prodName = (cartActionMatch[2] || '').trim();
-      const qty = parseInt(cartActionMatch[3] || '1', 10);
+
+    if (cartActionMatches.length > 0) {
       replyText = replyText.replace(/<cart_action[\s\S]*?\/?>/gi, '').trim();
-
-      const currentItems = ConversationEngine.getSessionCart(conversationId);
-      const resolved = ConversationEngine.resolveProductFromMessage(prodName, storeProducts) ||
-                       storeProducts.find(p => p.title.toLowerCase().includes(prodName.toLowerCase()));
-
       const adapter = CommerceAdapterFactory.getAdapter(tenant);
 
-      if (actionType === 'add' && resolved) {
-        ConversationEngine.addToSessionCart(conversationId, {
-          id: resolved.id,
-          title: resolved.title,
-          price: resolved.price.regular,
-          quantity: qty
-        });
-        if (adapter.addToCart) adapter.addToCart(resolved.id, undefined, qty, { shopperSessionId: input.shopperSessionId }).catch(() => {});
-        aiCartAction = { type: 'add', item: { id: resolved.id, title: resolved.title, price: resolved.price.regular, quantity: qty } };
-      } else if (actionType === 'remove' && (resolved || currentItems.length > 0)) {
-        const itemToRemove = resolved ? currentItems.find(it => it.id === resolved.id) : currentItems[0];
-        if (itemToRemove) {
-          ConversationEngine.removeFromSessionCart(conversationId, itemToRemove.id);
-          if (adapter.removeFromCart) adapter.removeFromCart(itemToRemove.id, { shopperSessionId: input.shopperSessionId }).catch(() => {});
-          aiCartAction = { type: 'remove', productId: itemToRemove.id, title: itemToRemove.title };
+      for (const actionMatch of cartActionMatches) {
+        const actionType = actionMatch[1].toLowerCase();
+        const prodName = (actionMatch[2] || '').trim();
+        const qty = parseInt(actionMatch[3] || '1', 10);
+
+        const currentItems = ConversationEngine.getSessionCart(conversationId);
+        const resolved = ConversationEngine.resolveProductFromMessage(prodName, storeProducts) ||
+                         storeProducts.find(p => p.title.toLowerCase().includes(prodName.toLowerCase()));
+
+        if (actionType === 'add' && resolved) {
+          ConversationEngine.addToSessionCart(conversationId, {
+            id: resolved.id,
+            title: resolved.title,
+            price: resolved.price.regular,
+            quantity: qty
+          });
+          if (adapter.addToCart) adapter.addToCart(resolved.id, undefined, qty, { shopperSessionId: input.shopperSessionId }).catch(() => {});
+          aiCartAction = { type: 'add', item: { id: resolved.id, title: resolved.title, price: resolved.price.regular, quantity: qty } };
+        } else if (actionType === 'remove' && (resolved || currentItems.length > 0)) {
+          const itemToRemove = resolved ? currentItems.find(it => it.id === resolved.id) : currentItems[0];
+          if (itemToRemove) {
+            ConversationEngine.removeFromSessionCart(conversationId, itemToRemove.id);
+            if (adapter.removeFromCart) adapter.removeFromCart(itemToRemove.id, { shopperSessionId: input.shopperSessionId }).catch(() => {});
+            aiCartAction = { type: 'remove', productId: itemToRemove.id, title: itemToRemove.title };
+          }
+        } else if (actionType === 'update' && (resolved || currentItems.length > 0)) {
+          const itemToUpdate = resolved ? currentItems.find(it => it.id === resolved.id) : currentItems[currentItems.length - 1];
+          if (itemToUpdate) {
+            ConversationEngine.setSessionCartQuantity(conversationId, itemToUpdate.id, qty);
+            if (adapter.addToCart) adapter.addToCart(itemToUpdate.id, undefined, qty, { shopperSessionId: input.shopperSessionId }).catch(() => {});
+            aiCartAction = { type: 'update', item: { id: itemToUpdate.id, title: itemToUpdate.title, price: itemToUpdate.price, quantity: qty } };
+          }
+        } else if (actionType === 'clear') {
+          ConversationEngine.clearSessionCart(conversationId);
+          if (adapter.clearCart) adapter.clearCart({ shopperSessionId: input.shopperSessionId }).catch(() => {});
+          aiCartAction = { type: 'clear' };
         }
-      } else if (actionType === 'clear') {
-        ConversationEngine.clearSessionCart(conversationId);
-        if (adapter.clearCart) adapter.clearCart({ shopperSessionId: input.shopperSessionId }).catch(() => {});
-        aiCartAction = { type: 'clear' };
       }
     }
 
