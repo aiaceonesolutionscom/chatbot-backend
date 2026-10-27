@@ -531,42 +531,52 @@ export class UniversalCommerceWidget {
     const chatBody = this.shadowRoot.getElementById('chatBody');
     if (!chatBody) return;
 
-    // Handle bidirectional real-time Cart Actions triggered by conversational AI
-    if (data.cartAction) {
-      const action = data.cartAction;
-      if (action.type === 'remove') {
-        WooCommerceStorefrontBridge.executeCartRemoval(action.productId || action.title).catch(() => {});
-        this.cartItems = this.cartItems.filter(it => 
-          it.id !== String(action.productId) && 
-          (!action.title || !it.title.toLowerCase().includes(String(action.title).toLowerCase()))
-        );
-        this.updateCartUI();
-      } else if (action.type === 'add' && action.item) {
-        WooCommerceStorefrontBridge.executeCartAddition(action.item.id, action.item.quantity || 1).catch(() => {});
-        const exist = this.cartItems.find(it => it.id === String(action.item.id));
-        if (exist) {
-          exist.quantity += (action.item.quantity || 1);
-        } else {
-          this.cartItems.push({
-            id: String(action.item.id),
-            title: action.item.title,
-            price: Number(action.item.price || 0),
-            quantity: action.item.quantity || 1
-          });
+    // Handle bidirectional real-time Cart Actions triggered by conversational AI (supports multiple sequential compound actions)
+    const rawActions: any[] = Array.isArray(data.cartActions) && data.cartActions.length > 0 
+      ? data.cartActions 
+      : (data.cartAction ? [data.cartAction] : []);
+
+    if (rawActions.length > 0) {
+      for (const action of rawActions) {
+        if (!action || !action.type) continue;
+        if (action.type === 'remove') {
+          WooCommerceStorefrontBridge.executeCartRemoval(action.productId || action.title).catch(() => {});
+          this.cartItems = this.cartItems.filter(it => 
+            it.id !== String(action.productId) && 
+            (!action.title || !it.title.toLowerCase().includes(String(action.title).toLowerCase()))
+          );
+        } else if (action.type === 'add' && action.item) {
+          WooCommerceStorefrontBridge.executeCartAddition(action.item.id, action.item.quantity || 1).catch(() => {});
+          const exist = this.cartItems.find(it => it.id === String(action.item.id));
+          if (exist) {
+            exist.quantity += (action.item.quantity || 1);
+          } else {
+            this.cartItems.push({
+              id: String(action.item.id),
+              title: action.item.title,
+              price: Number(action.item.price || 0),
+              quantity: action.item.quantity || 1
+            });
+          }
+        } else if (action.type === 'update' && action.item) {
+          WooCommerceStorefrontBridge.executeCartUpdate(action.item.id, action.item.quantity).catch(() => {});
+          const exist = this.cartItems.find(it => it.id === String(action.item.id));
+          if (exist) {
+            exist.quantity = action.item.quantity;
+          } else {
+            this.cartItems.push({
+              id: String(action.item.id),
+              title: action.item.title,
+              price: Number(action.item.price || 0),
+              quantity: action.item.quantity || 1
+            });
+          }
+        } else if (action.type === 'clear') {
+          WooCommerceStorefrontBridge.clearStoreCart().catch(() => {});
+          this.cartItems = [];
         }
-        this.updateCartUI();
-      } else if (action.type === 'update' && action.item) {
-        WooCommerceStorefrontBridge.executeCartUpdate(action.item.id, action.item.quantity).catch(() => {});
-        const exist = this.cartItems.find(it => it.id === String(action.item.id));
-        if (exist) {
-          exist.quantity = action.item.quantity;
-        }
-        this.updateCartUI();
-      } else if (action.type === 'clear') {
-        WooCommerceStorefrontBridge.clearStoreCart().catch(() => {});
-        this.cartItems = [];
-        this.updateCartUI();
       }
+      this.updateCartUI();
     }
 
     const botRow = document.createElement('div');

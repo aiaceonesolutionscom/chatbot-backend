@@ -503,121 +503,239 @@ export class ConversationEngine {
         const cleanForQty = msgLower.replace(/\b\d+\s*(?:mg|m)\b/gi, '').trim();
         const qtyMatch = cleanForQty.match(/\b([1-9]|10)\s*(x|pieces?|vials?|bottles?)?\b/i);
         const parsedQty = semanticIntent.quantity || (qtyMatch ? parseInt(qtyMatch[1], 10) : 1);
-        // 2A_COMPOUND. COMPOUND INTENT: REMOVE ONE ITEM & ADD ANOTHER / BUDGET ITEM
-        // E.g. "acha tirz 30 mg hata do or 15 dollar ka kuch add akroo kia hai tumharay apas 15 dollar ka"
+        // 2A_COMPOUND. AGENTIC COMPOUND MULTI-ACTION HANDLER
+        // Executes multiple discrete actions in a single user turn:
+        // E.g. "tirz 60 mg add kardo, bacteriostatic water bhi add kardo, tirz 10mg hata do, aur tirz 60mg ki qty double kardo"
         // E.g. "tirz 60 mg ko hata do ro iski jagah bacteriostatic water add akrdo"
-        // E.g. "remove tirz 60mg and in its place add bacteriostatic water"
+        // E.g. "acha tirz 30 mg hata do or 15 dollar ka kuch add akroo kia hai tumharay apas 15 dollar ka"
+        // E.g. "semaglutide 10mg aur semaglutide 5mg add kardo aur tirz 10mg hata do"
         const hasRemoveVerb = /\b(hata\w*|nikaal\w*|nikal\w*|remove\w*|delete\w*|drop|discard|chhor\w*|chhod\w*|quita\w*|elimina\w*)\b/i.test(msgLower);
-        const hasSwapOrAddVerb = /\b(aur|or|ro|and|nd|y|\+)\b.*\b(add|dalo|daal|shamil|lena|dedo|bhejo|dollar|\$|budget|pon|agrega\w*)\b/i.test(msgLower) ||
+        const hasSwapOrAddVerb = /\b(aur|or|ro|and|nd|y|\+)\b.*\b(add|dalo|daal|shamil|pack|bhejo|lena|dedo|dollar|\$|budget|pon|agrega\w*|anad\w*)\b/i.test(msgLower) ||
             /\b(ki\s*jagah|iski\s*jagah|uski\s*jagah|ke\s*badle|ke\s*bajaye|instead\s*of|in\s*place\s*of|en\s*lugar\s*de|replace\s*with|swap\s*with)\b/i.test(msgLower);
-        if (hasRemoveVerb && hasSwapOrAddVerb && currentSessionItems.length > 0) {
-            const parts = msgLower.split(/\b(?:aur|or|ro|and|nd|y|ki\s*jagah|iski\s*jagah|uski\s*jagah|ke\s*badle|ke\s*bajaye|instead\s*of|in\s*place\s*of|en\s*lugar\s*de|replace\s*with|swap\s*with|\+)\b/i);
-            const validParts = parts.map(p => p.trim()).filter(p => p.length > 0);
-            const removePart = validParts.find(p => /\b(hata|remove|nikaal|nikal|drop|chhor|quita|elimina)\b/i.test(p)) || validParts[0];
-            const addPart = validParts.find(p => p !== removePart) || '';
-            // 1. Resolve item to remove
-            let itemToRemoveCandidate = ConversationEngine.resolveProductFromMessage(removePart, storeProducts);
-            let removedItem;
-            if (!itemToRemoveCandidate) {
-                const remDoseMatch = removePart.match(/\b(\d+)\s*(?:mg|m)\b/i) || removePart.match(/\b(60|30|10|5)\b/i);
-                if (remDoseMatch) {
-                    const doseStr = `${remDoseMatch[1]}mg`;
-                    const matchCart = currentSessionItems.find(it => it.title.toLowerCase().replace(/\s+/g, '').includes(doseStr));
-                    if (matchCart) {
-                        itemToRemoveCandidate = storeProducts.find(p => p.id === matchCart.id);
+        const hasQtyVerb = /\b(qty|quantity|barha\w*|double|dabal|do\s*guna|2x|kam\s*k\w*|minus|ghata\w*)\b/i.test(msgLower);
+        const isCompoundMultiAction = (hasRemoveVerb && (hasSwapOrAddVerb || hasQtyVerb)) ||
+            (hasRemoveVerb && currentSessionItems.length > 0 && /[,;\n]|\b(?:aur|or|ro|and|nd|y|phir|uske\s*baad|then)\b/i.test(msgLower)) ||
+            (hasSwapOrAddVerb && hasQtyVerb && currentSessionItems.length > 0);
+        if (isCompoundMultiAction) {
+            const clauses = msgLower
+                .split(/[,;\n]|\b(?:aur|or|ro|and|nd|y|phir|uske\s*baad|iske\s*baad|then|after\s*that|pero|luego|ki\s*jagah|iski\s*jagah|uski\s*jagah|ke\s*badle|ke\s*bajaye|instead\s*of|in\s*place\s*of|en\s*lugar\s*de|replace\s*with|swap\s*with)\b/i)
+                .map(c => c.trim())
+                .filter(c => c.length > 0);
+            const parsedClauses = [];
+            for (const clause of clauses) {
+                // 1. Resolve product
+                let prod = ConversationEngine.resolveProductFromMessage(clause, storeProducts);
+                let budgetNotice = '';
+                if (!prod) {
+                    const doseMatch = clause.match(/\b(\d+)\s*(?:mg|m)\b/i) || clause.match(/\b(60|30|10|5)\b/i);
+                    let compMatch = '';
+                    if (/\b(tirz|trirz|triz|irz)\b/i.test(clause))
+                        compMatch = 'tirz';
+                    else if (/\b(sema|semaglutide|semaglutude)\b/i.test(clause))
+                        compMatch = 'sema';
+                    else if (/\b(reta|retatrutide)\b/i.test(clause))
+                        compMatch = 'reta';
+                    else if (/\b(water|bacteriostatic|wtr)\b/i.test(clause))
+                        compMatch = 'water';
+                    if (doseMatch && compMatch) {
+                        const doseStr = `${doseMatch[1]}mg`;
+                        prod = storeProducts.find(p => {
+                            const t = p.title.toLowerCase().replace(/\s+/g, '');
+                            return t.includes(compMatch) && t.includes(doseStr);
+                        });
+                    }
+                    if (!prod && doseMatch) {
+                        prod = storeProducts.find(p => p.title.toLowerCase().replace(/\s+/g, '').includes(`${doseMatch[1]}mg`));
+                    }
+                    if (!prod && compMatch) {
+                        prod = storeProducts.find(p => p.title.toLowerCase().includes(compMatch));
                     }
                 }
-            }
-            if (itemToRemoveCandidate) {
-                removedItem = ConversationEngine.removeFromSessionCart(conversationId, itemToRemoveCandidate.id);
-                if (adapter.removeFromCart) {
-                    adapter.removeFromCart(itemToRemoveCandidate.id, { shopperSessionId: input.shopperSessionId }).catch(() => { });
-                }
-            }
-            // 2. Resolve item to add (by product name or budget)
-            let itemToAddCandidate = ConversationEngine.resolveProductFromMessage(addPart, storeProducts);
-            let budgetNotice = '';
-            if (!itemToAddCandidate) {
-                const bMatch = msgLower.match(/(\d+)\s*(?:dollar|\$|usd)/i);
-                if (bMatch) {
-                    const bVal = parseInt(bMatch[1], 10);
-                    const budgetFits = storeProducts
-                        .filter(p => p.price.regular <= bVal)
-                        .sort((a, b) => b.price.regular - a.price.regular);
-                    if (budgetFits.length > 0) {
-                        itemToAddCandidate = budgetFits[0];
-                        budgetNotice = isUrduLang
-                            ? `Aapke **$${bVal}** budget ke mutabiq **${itemToAddCandidate.title}** ($${itemToAddCandidate.price.regular.toFixed(2)}) sab se behtareen match hai!`
-                            : `Based on your **$${bVal}** budget, **${itemToAddCandidate.title}** ($${itemToAddCandidate.price.regular.toFixed(2)}) is the perfect fit!`;
+                // Budget match e.g. "15 dollar ka kuch add akroo"
+                if (!prod) {
+                    const bMatch = clause.match(/(\d+)\s*(?:dollar|\$|usd)/i);
+                    if (bMatch) {
+                        const bVal = parseInt(bMatch[1], 10);
+                        const budgetFits = storeProducts
+                            .filter(p => p.price.regular <= bVal)
+                            .sort((a, b) => b.price.regular - a.price.regular);
+                        if (budgetFits.length > 0) {
+                            prod = budgetFits[0];
+                            budgetNotice = isUrduLang
+                                ? `Aapke **$${bVal}** budget ke mutabiq **${prod.title}** ($${prod.price.regular.toFixed(2)}) sab se behtareen match hai!`
+                                : `Based on your **$${bVal}** budget, **${prod.title}** ($${prod.price.regular.toFixed(2)}) is the perfect fit!`;
+                        }
                     }
                 }
-            }
-            if (itemToAddCandidate) {
-                ConversationEngine.addToSessionCart(conversationId, {
-                    id: itemToAddCandidate.id,
-                    title: itemToAddCandidate.title,
-                    price: itemToAddCandidate.price.regular,
-                    quantity: 1
-                });
-                if (adapter.addToCart) {
-                    adapter.addToCart(itemToAddCandidate.id, undefined, 1, { shopperSessionId: input.shopperSessionId }).catch(() => { });
+                // Determine action type
+                const isRemove = /\b(hata\w*|nikaal\w*|nikal\w*|remove\w*|delete\w*|drop|discard|chhor\w*|chhod\w*|quita\w*|elimina\w*)\b/i.test(clause);
+                const isQty = /\b(qty|quantity|barha\w*|double|dabal|do\s*guna|2x|kam\s*k\w*|minus|ghata\w*)\b/i.test(clause);
+                const isAdd = /\b(add\w*|dalo|daal\w*|shamil|pack\w*|bhejo|de\s*do|dedo|lena|mangwana|khareed\w*|kharid\w*|order|basket|pon|agrega\w*|anad\w*)\b/i.test(clause);
+                let type = 'add';
+                if (isRemove)
+                    type = 'remove';
+                else if (isQty)
+                    type = 'update';
+                else if (isAdd)
+                    type = 'add';
+                // Match against existing cart items for remove or update
+                let cartItem;
+                if (prod) {
+                    cartItem = currentSessionItems.find(it => it.id === prod.id);
+                }
+                else {
+                    const doseMatch = clause.match(/\b(\d+)\s*(?:mg|m)\b/i);
+                    if (doseMatch) {
+                        cartItem = currentSessionItems.find(it => it.title.toLowerCase().replace(/\s+/g, '').includes(`${doseMatch[1]}mg`));
+                    }
+                    if (!cartItem) {
+                        cartItem = currentSessionItems.find(it => clause.includes(it.title.toLowerCase()));
+                    }
+                    if (cartItem && !prod) {
+                        prod = storeProducts.find(p => p.id === cartItem.id);
+                    }
+                }
+                // Parse quantity
+                let qty = 1;
+                if (/double|dabal|do\s*guna|2x/i.test(clause)) {
+                    qty = cartItem ? Math.max(2, cartItem.quantity * 2) : 2;
+                }
+                else {
+                    const cleanClause = clause.replace(/\b\d+\s*(?:mg|m)\b/gi, '').trim();
+                    const qm = cleanClause.match(/\b([1-9]|10)\s*(?:x|qty|pieces?|vials?|bottles?)?\b/i);
+                    if (qm)
+                        qty = parseInt(qm[1], 10);
+                }
+                const hasExplicitVerb = isRemove || isQty || isAdd;
+                if (prod || cartItem) {
+                    parsedClauses.push({
+                        clause,
+                        prod,
+                        cartItem,
+                        type,
+                        qty,
+                        budgetNotice,
+                        hasExplicitVerb
+                    });
                 }
             }
-            const sessionItems = ConversationEngine.getSessionCart(conversationId);
-            const subtotal = sessionItems.reduce((acc, it) => acc + (it.price * it.quantity), 0);
-            const remTitle = removedItem ? removedItem.title : (itemToRemoveCandidate ? itemToRemoveCandidate.title : 'Item');
-            let cartListing = '';
-            if (sessionItems.length > 0) {
-                cartListing = '\n\n🛒 **Aapke Cart Mein Maujood Products**:\n' +
-                    sessionItems.map(it => `• **${it.title}** (${it.quantity}x) — $${(it.price * it.quantity).toFixed(2)}`).join('\n') +
-                    `\n💵 **Updated Total**: $${subtotal.toFixed(2)}\n\n🔗 [View Full Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)`;
+            // Inherit action types for clauses with product but no explicit verb
+            for (let i = 0; i < parsedClauses.length; i++) {
+                const c = parsedClauses[i];
+                if (!c.hasExplicitVerb) {
+                    if (parsedClauses[i + 1]?.type === 'remove')
+                        c.type = 'remove';
+                    else if (parsedClauses[i + 1]?.type === 'add')
+                        c.type = 'add';
+                    else if (parsedClauses[i - 1]?.type === 'remove')
+                        c.type = 'remove';
+                    else if (parsedClauses[i - 1]?.type === 'add')
+                        c.type = 'add';
+                }
             }
-            else {
-                cartListing = '\n\nAapka cart ab khali hai.';
-            }
-            const isSpanishLang = /\b(hola|quiero|productos?|carrito|cuanto|cuesta|por\s*favor|gracias|anadir|agrega|eliminar|quitar|cambiar|reemplazar|pagar|vaciar|tienen|tienes|puedo|ayuda)\b/i.test(msgLower);
-            let msg = '';
-            if (isUrduLang) {
-                msg = `✅ **${remTitle}** aapke shopping cart se remove kar diya gaya hai.\n\n` +
-                    (itemToAddCandidate ? `✅ **${itemToAddCandidate.title}** (1x) kamyabi se aapke cart mein **ADD** kar diya gaya hai!\n${budgetNotice}` : '') +
-                    cartListing;
-            }
-            else if (isSpanishLang) {
-                msg = `✅ **${remTitle}** ha sido eliminado de tu carrito.\n\n` +
-                    (itemToAddCandidate ? `✅ ¡**${itemToAddCandidate.title}** (1x) ha sido añadido con éxito a tu carrito!\n` : '') +
-                    cartListing;
-            }
-            else {
-                msg = `✅ **${remTitle}** has been removed from your shopping cart.\n\n` +
-                    (itemToAddCandidate ? `✅ **${itemToAddCandidate.title}** (1x) has been successfully ADDED to your cart!\n${budgetNotice}` : '') +
-                    cartListing;
-            }
-            const response = {
-                conversationId,
-                role: 'assistant',
-                message: msg,
-                productCards: itemToAddCandidate ? [itemToAddCandidate] : undefined,
-                cartAction: itemToAddCandidate ? {
-                    type: 'add',
-                    item: {
-                        id: itemToAddCandidate.id,
-                        title: itemToAddCandidate.title,
-                        price: itemToAddCandidate.price.regular,
-                        quantity: 1
+            if (parsedClauses.length > 0) {
+                const addedList = [];
+                const removedList = [];
+                const updatedList = [];
+                const collectedActions = [];
+                for (const item of parsedClauses) {
+                    if (item.type === 'remove') {
+                        const targetId = item.cartItem?.id || item.prod?.id;
+                        const targetTitle = item.cartItem?.title || item.prod?.title || 'Item';
+                        if (targetId) {
+                            ConversationEngine.removeFromSessionCart(conversationId, targetId);
+                            if (adapter.removeFromCart) {
+                                adapter.removeFromCart(targetId, { shopperSessionId: input.shopperSessionId }).catch(() => { });
+                            }
+                            removedList.push(targetTitle);
+                            collectedActions.push({ type: 'remove', productId: targetId, title: targetTitle });
+                        }
                     }
-                } : (removedItem ? {
-                    type: 'remove',
-                    productId: removedItem.id,
-                    title: removedItem.title
-                } : undefined),
-                quickReplies: [
-                    { label: 'View Full Cart', actionText: 'Show my cart' },
-                    { label: 'Proceed to Checkout', actionText: 'Proceed to checkout' },
-                    { label: 'Show All Products', actionText: 'Show all products' }
-                ]
-            };
-            this.recordTurn(conversationId, trimmedMessage, msg);
-            return response;
+                    else if (item.type === 'add' && item.prod) {
+                        ConversationEngine.addToSessionCart(conversationId, {
+                            id: item.prod.id,
+                            title: item.prod.title,
+                            price: item.prod.price.regular,
+                            quantity: item.qty
+                        });
+                        if (adapter.addToCart) {
+                            adapter.addToCart(item.prod.id, undefined, item.qty, { shopperSessionId: input.shopperSessionId }).catch(() => { });
+                        }
+                        addedList.push({ prod: item.prod, qty: item.qty, budgetNotice: item.budgetNotice });
+                        collectedActions.push({
+                            type: 'add',
+                            item: { id: item.prod.id, title: item.prod.title, price: item.prod.price.regular, quantity: item.qty }
+                        });
+                    }
+                    else if (item.type === 'update' && item.prod) {
+                        ConversationEngine.setSessionCartQuantity(conversationId, item.prod.id, item.qty);
+                        if (adapter.addToCart) {
+                            adapter.addToCart(item.prod.id, undefined, item.qty, { shopperSessionId: input.shopperSessionId }).catch(() => { });
+                        }
+                        updatedList.push({ prod: item.prod, qty: item.qty });
+                        collectedActions.push({
+                            type: 'update',
+                            item: { id: item.prod.id, title: item.prod.title, price: item.prod.price.regular, quantity: item.qty }
+                        });
+                    }
+                }
+                const sessionItems = ConversationEngine.getSessionCart(conversationId);
+                const subtotal = sessionItems.reduce((acc, it) => acc + (it.price * it.quantity), 0);
+                const isSpanishLang = /\b(hola|quiero|productos?|carrito|cuanto|cuesta|por\s*favor|gracias|anadir|agrega|eliminar|quitar|cambiar|reemplazar|pagar|vaciar|tienen|tienes|puedo|ayuda)\b/i.test(msgLower);
+                // Build multi-step conversational confirmation
+                const confirmations = [];
+                if (removedList.length > 0) {
+                    const remText = removedList.map(t => `**${t}**`).join(', ');
+                    confirmations.push(isUrduLang
+                        ? `✅ ${remText} aapke shopping cart se remove kar diya gaya hai.`
+                        : isSpanishLang
+                            ? `✅ ${remText} ha sido eliminado de tu carrito.`
+                            : `✅ ${remText} has been removed from your shopping cart.`);
+                }
+                if (addedList.length > 0) {
+                    for (const a of addedList) {
+                        confirmations.push(isUrduLang
+                            ? `✅ **${a.prod.title}** (${a.qty}x) kamyabi se aapke cart mein **ADD** kar diya gaya hai!` + (a.budgetNotice ? `\n${a.budgetNotice}` : '')
+                            : isSpanishLang
+                                ? `✅ ¡**${a.prod.title}** (${a.qty}x) ha sido añadido con éxito a tu carrito!` + (a.budgetNotice ? `\n${a.budgetNotice}` : '')
+                                : `✅ **${a.prod.title}** (${a.qty}x) has been successfully ADDED to your cart!` + (a.budgetNotice ? `\n${a.budgetNotice}` : ''));
+                    }
+                }
+                if (updatedList.length > 0) {
+                    for (const u of updatedList) {
+                        confirmations.push(isUrduLang
+                            ? `✅ **${u.prod.title}** ki quantity ko update karke **${u.qty}x** kar diya gaya hai.`
+                            : isSpanishLang
+                                ? `✅ La cantidad de **${u.prod.title}** ha sido actualizada a **${u.qty}x**.`
+                                : `✅ The quantity for **${u.prod.title}** has been updated to **${u.qty}x**.`);
+                    }
+                }
+                let cartListing = '';
+                if (sessionItems.length > 0) {
+                    cartListing = '\n\n🛒 **Aapke Cart Mein Maujood Products**:\n' +
+                        sessionItems.map(it => `• **${it.title}** (${it.quantity}x) — $${(it.price * it.quantity).toFixed(2)}`).join('\n') +
+                        `\n💵 **Estimated Subtotal**: $${subtotal.toFixed(2)}\n\n🔗 [View Full Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)`;
+                }
+                else {
+                    cartListing = isUrduLang ? '\n\nAapka cart ab khali hai.' : '\n\nYour cart is now clear and empty.';
+                }
+                const msg = confirmations.join('\n\n') + cartListing;
+                const response = {
+                    conversationId,
+                    role: 'assistant',
+                    message: msg,
+                    productCards: addedList.length > 0 ? addedList.map(a => a.prod) : undefined,
+                    cartAction: collectedActions.find(a => a.type === 'add') || collectedActions[0],
+                    cartActions: collectedActions,
+                    quickReplies: [
+                        { label: 'View Full Cart', actionText: 'Show my cart' },
+                        { label: 'Proceed to Checkout', actionText: 'Proceed to checkout' },
+                        { label: 'Show All Products', actionText: 'Show all products' }
+                    ]
+                };
+                this.recordTurn(conversationId, trimmedMessage, msg);
+                return response;
+            }
         }
         // 2A_DISCOVERY. CATALOG & PRODUCT INQUIRY HANDLER
         // Matches: "i want to add a product but i didnt know what you have?", "what do you have?", "apke pas kya hai", "app kia kaibechtay hoo", "que tienen?"
@@ -1463,6 +1581,12 @@ export class ConversationEngine {
         const supportEmail = tenant.company?.supportEmail || 'support@hawksnfox.com';
         // Build clear catalog inventory for the AI
         const productListText = storeProducts.map(p => `- ${p.title} | Price: ${p.price.formatted} | In Stock: ${p.inStock ? 'Yes' : 'No'} | Description: ${(p.description || '').substring(0, 120)}`).join('\n');
+        // Retrieve live session cart inventory to give AI 100% accurate context of what the shopper already has
+        const liveSessionCart = ConversationEngine.getSessionCart(conversationId);
+        const cartInventoryText = liveSessionCart.length > 0
+            ? liveSessionCart.map(it => `- ${it.title} | Qty: ${it.quantity}x | Unit Price: $${it.price.toFixed(2)} | Subtotal: $${(it.price * it.quantity).toFixed(2)}`).join('\n') +
+                `\nCurrent Cart Subtotal: $${liveSessionCart.reduce((acc, it) => acc + (it.price * it.quantity), 0).toFixed(2)}`
+            : 'Cart is currently empty.';
         const systemPrompt = `
 You are ${assistantName}, the dedicated customer service and sales assistant for ${companyName} (${storeUrl}).
 Your persona is warm, highly intelligent, respectful, empathetic, and scientifically knowledgeable—like a senior customer care specialist at a biotechnology research firm.
@@ -1474,14 +1598,23 @@ ${aboutUs}
 - Support Email: ${supportEmail}
 - Ordering & Checkout: Direct Add to Cart in chat, or checkout at ${storeUrl}/checkout/
 
+CURRENT SHOPPER CART (REAL-TIME SESSION INVENTORY):
+${cartInventoryText}
+
 OUR LIVE CATALOG & EXACT PRICES:
 ${productListText || 'No products listed.'}
 
 CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
-0. CORE AGENTIC PRINCIPLE (INTENT-FIRST AUTONOMOUS ACTION):
-   - DEEPLY COMPREHEND USER INTENT: Read beyond literal words and rigid keywords. Discern what the user truly wants to achieve (shopping, comparing, budget match, modifying cart, tracking, checkout), regardless of typos, colloquial slang, Roman Urdu ("ghuma phera ke bolen"), or foreign languages.
-   - ACT AUTONOMOUSLY ON THEIR BEHALF: When the user's intent is clear, execute decisive actions (add, remove, update quantity, swap, clear, checkout) on their behalf using <cart_action> tags and direct links. Never force the user to perform manual steps or navigate away to do simple cart operations.
-   - ASK POLITE CLARIFYING QUESTIONS WHEN UNCLEAR (ZERO ASSUMPTIONS): If the user's intent or the specific product/dosage is ambiguous, vague, or incomplete, DO NOT guess or pick random products. Act like a polite, human customer support specialist and ask a friendly clarifying question so the user can guide you.
+0. CORE AGENTIC PRINCIPLE (INTENT-FIRST AUTONOMOUS MULTI-ACTION PLANNING):
+   - DEEPLY COMPREHEND USER INTENT: Read beyond literal words and rigid keywords. Discern what the user truly wants to achieve across all clauses, whether they speak in Roman Urdu ("ghuma phera ke bolen"), English, Spanish, or casual slang.
+   - COMPOUND MULTI-ACTION EXECUTION IN A SINGLE TURN: If a customer requests multiple actions in a single message (e.g. adding 4 products, removing 3 products, and doubling or adjusting the quantity of other products), you MUST plan and execute ALL of them decisively in that single turn!
+   - EMIT SEQUENTIAL CART ACTIONS: For every discrete operation, append a hidden machine-readable tag at the very end of your response:
+     <cart_action action="add" product="Exact Product Title" quantity="N" />
+     <cart_action action="remove" product="Exact Product Title" quantity="N" />
+     <cart_action action="update" product="Exact Product Title" quantity="N" />
+     <cart_action action="clear" />
+   - TYPO & PHONETIC RESILIENCE: Users frequently make spelling errors or use colloquial abbreviations (e.g., "trirz", "triz", "irz" -> Tirz; "sema", "semaglutude" -> Semaglutide; "reta" -> Retatrutide; "bac water", "wtr" -> Bacteriostatic Water; "dabal", "do guna" -> 2x quantity). Intelligently map these to our exact catalog products.
+   - POLITE HUMAN CLARIFICATION ON AMBIGUITY: If a request is completely ambiguous or missing crucial dosage info (e.g. user says "tirz add kardo" without specifying 10mg, 30mg, or 60mg), DO NOT guess blindly! Ask a polite, friendly clarifying question like a senior customer support specialist.
 
 1. STRICT DOMAIN BOUNDARY:
    - You are ONLY permitted to talk about ${companyName}, research peptides, diluents (Bacteriostatic Water), pricing, availability, orders, and shipping.
@@ -1711,6 +1844,7 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
         // Process machine-readable <cart_action> tags emitted by AI (supports multi-step sequential actions)
         const cartActionMatches = [...replyText.matchAll(/<cart_action\s+action=["']([^"']+)["'](?:\s+product=["']([^"']+)["'])?(?:\s+quantity=["']?(\d+)["']?)?\s*\/?>/gi)];
         let aiCartAction = undefined;
+        const collectedCartActions = [];
         if (cartActionMatches.length > 0) {
             replyText = replyText.replace(/<cart_action[\s\S]*?\/?>/gi, '').trim();
             const adapter = CommerceAdapterFactory.getAdapter(tenant);
@@ -1730,7 +1864,9 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
                     });
                     if (adapter.addToCart)
                         adapter.addToCart(resolved.id, undefined, qty, { shopperSessionId: input.shopperSessionId }).catch(() => { });
-                    aiCartAction = { type: 'add', item: { id: resolved.id, title: resolved.title, price: resolved.price.regular, quantity: qty } };
+                    const actionObj = { type: 'add', item: { id: resolved.id, title: resolved.title, price: resolved.price.regular, quantity: qty } };
+                    aiCartAction = actionObj;
+                    collectedCartActions.push(actionObj);
                 }
                 else if (actionType === 'remove' && (resolved || currentItems.length > 0)) {
                     const itemToRemove = resolved ? currentItems.find(it => it.id === resolved.id) : currentItems[0];
@@ -1738,7 +1874,9 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
                         ConversationEngine.removeFromSessionCart(conversationId, itemToRemove.id);
                         if (adapter.removeFromCart)
                             adapter.removeFromCart(itemToRemove.id, { shopperSessionId: input.shopperSessionId }).catch(() => { });
-                        aiCartAction = { type: 'remove', productId: itemToRemove.id, title: itemToRemove.title };
+                        const actionObj = { type: 'remove', productId: itemToRemove.id, title: itemToRemove.title };
+                        aiCartAction = actionObj;
+                        collectedCartActions.push(actionObj);
                     }
                 }
                 else if (actionType === 'update' && (resolved || currentItems.length > 0)) {
@@ -1747,14 +1885,18 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
                         ConversationEngine.setSessionCartQuantity(conversationId, itemToUpdate.id, qty);
                         if (adapter.addToCart)
                             adapter.addToCart(itemToUpdate.id, undefined, qty, { shopperSessionId: input.shopperSessionId }).catch(() => { });
-                        aiCartAction = { type: 'update', item: { id: itemToUpdate.id, title: itemToUpdate.title, price: itemToUpdate.price, quantity: qty } };
+                        const actionObj = { type: 'update', item: { id: itemToUpdate.id, title: itemToUpdate.title, price: itemToUpdate.price, quantity: qty } };
+                        aiCartAction = actionObj;
+                        collectedCartActions.push(actionObj);
                     }
                 }
                 else if (actionType === 'clear') {
                     ConversationEngine.clearSessionCart(conversationId);
                     if (adapter.clearCart)
                         adapter.clearCart({ shopperSessionId: input.shopperSessionId }).catch(() => { });
-                    aiCartAction = { type: 'clear' };
+                    const actionObj = { type: 'clear' };
+                    aiCartAction = actionObj;
+                    collectedCartActions.push(actionObj);
                 }
             }
         }
@@ -1769,6 +1911,7 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
             message: replyText,
             productCards: finalCards.length > 0 ? finalCards : undefined,
             cartAction: aiCartAction,
+            cartActions: collectedCartActions.length > 0 ? collectedCartActions : undefined,
             quickReplies
         };
     }

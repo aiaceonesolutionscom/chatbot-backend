@@ -28,6 +28,12 @@ export interface ChatResponse {
         item?: any;
         title?: string;
     };
+    cartActions?: (CartOperationResult | {
+        type: string;
+        productId?: string;
+        item?: any;
+        title?: string;
+    })[];
     toolExecuted?: {
         toolName: string;
         params: Record<string, unknown>;

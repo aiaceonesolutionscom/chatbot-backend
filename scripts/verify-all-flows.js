@@ -513,9 +513,28 @@ async function runTestSuite() {
   assert(esCart.some(i => i.title.toLowerCase().includes('water')), 'Bacteriostatic Water was added via Spanish');
   assert(res.message.includes('eliminado') || res.message.includes('añadido') || res.message.includes('Water'), 'Spanish confirmation formulated');
 
+  // TEST 38: Agentic Compound Multi-Action (Add 2 items, Remove 1 item, Double 1 item in single turn)
+  console.log('\n--- Step 38: Agentic Compound Multi-Action (Compound Add, Remove & Double Qty) ---');
+  const convIdCompound = `test_conv_comp_${Date.now()}`;
+  ConversationEngine.syncSessionCart(convIdCompound, [
+    { id: '7088', title: 'Tirz 10mg', price: 150, quantity: 1 }
+  ]);
+  res = await ConversationEngine.processMessage({
+    conversationId: convIdCompound,
+    message: 'tirz 60 mg add kardo, bacteriostatic water bhi add kardo, tirz 10mg hata do, aur tirz 60mg ki qty double kardo',
+    tenant
+  });
+  const finalCompCart = ConversationEngine.getSessionCart(convIdCompound);
+  assert(!finalCompCart.some(i => i.title.includes('Tirz 10mg')), 'Tirz 10mg successfully removed in compound turn');
+  const compTirz60 = finalCompCart.find(i => i.title.includes('60mg'));
+  assert(compTirz60 && compTirz60.quantity === 2, 'Tirz 60mg quantity successfully doubled to 2x');
+  assert(finalCompCart.some(i => i.title.toLowerCase().includes('water')), 'Bacteriostatic Water added in compound turn');
+  assert(Array.isArray(res.cartActions) && res.cartActions.length === 4, 'All 4 discrete cart actions emitted in array');
+  assert(res.message.includes('1365') || res.message.includes('1,365'), 'Subtotal calculated accurately for compound order ($1365.00)');
+
   console.log('\n================================================================');
   if (allPassed) {
-    console.log('🎉 ALL 37 VERIFICATION TESTS PASSED WITH 100% ACCURACY!');
+    console.log('🎉 ALL 38 VERIFICATION TESTS PASSED WITH 100% ACCURACY!');
   } else {
     console.error('❌ SOME TESTS FAILED. PLEASE REVIEW OUTPUT ABOVE.');
   }
