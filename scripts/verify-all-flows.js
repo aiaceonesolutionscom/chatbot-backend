@@ -153,9 +153,91 @@ async function runTestSuite() {
   assert(res.message.includes('CANCELLED') || res.message.includes('kamyabi'), 'Confirms verified order cancellation');
   assert(res.message.includes('customer@example.com'), 'Echoes verified customer email');
 
+  // TEST 13: Exact Dosage & Quantity Disambiguation ("tirz 10 mg add akroo cart mai")
+  console.log('\n--- Step 13: Exact Dosage Disambiguation ("tirz 10 mg add akroo cart mai") ---');
+  const convId2 = `test_conv_dosage_${Date.now()}`;
+  res = await ConversationEngine.processMessage({
+    conversationId: convId2,
+    message: 'tirz 10 mg add akroo cart mai',
+    tenant
+  });
+  let cart2 = ConversationEngine.getSessionCart(convId2);
+  let tirz10 = cart2.find(it => it.title.includes('10mg'));
+  assert(tirz10 !== undefined, 'Accurately resolved Tirz 10mg instead of 60mg');
+  assert(tirz10 && tirz10.quantity === 1, 'Quantity is 1x, NOT 10x from "10mg" dosage!', `Actual qty: ${tirz10?.quantity}`);
+  assert(res.message.includes('$150'), 'Price reflected as $150.00, NOT $6,750.00');
+
+  // TEST 14: Quantity Increase ("quantity 3 kardo iskii")
+  console.log('\n--- Step 14: Quantity Set ("quantity 3 kardo iskii") ---');
+  res = await ConversationEngine.processMessage({
+    conversationId: convId2,
+    message: 'quantity 3 kardo iskii',
+    tenant
+  });
+  cart2 = ConversationEngine.getSessionCart(convId2);
+  tirz10 = cart2.find(it => it.title.includes('10mg'));
+  assert(tirz10 && tirz10.quantity === 3, 'Quantity updated to 3x', `Actual: ${tirz10?.quantity}`);
+  assert(res.productCards === undefined, 'No product cards shown on quantity update');
+
+  // TEST 15: Quantity Minus ("1 minus akrdoo")
+  console.log('\n--- Step 15: Quantity Minus ("1 minus akrdoo") ---');
+  res = await ConversationEngine.processMessage({
+    conversationId: convId2,
+    message: '1 minus akrdoo',
+    tenant
+  });
+  cart2 = ConversationEngine.getSessionCart(convId2);
+  tirz10 = cart2.find(it => it.title.includes('10mg'));
+  assert(tirz10 && tirz10.quantity === 2, 'Quantity reduced by 1 to 2x', `Actual: ${tirz10?.quantity}`);
+  assert(res.productCards === undefined, 'No product cards shown on minus');
+
+  // TEST 16: Quantity Decrement ("remove akrdo ik quantity")
+  console.log('\n--- Step 16: Decrement ("remove akrdo ik quantity") ---');
+  res = await ConversationEngine.processMessage({
+    conversationId: convId2,
+    message: 'remove akrdo ik quantity',
+    tenant
+  });
+  cart2 = ConversationEngine.getSessionCart(convId2);
+  tirz10 = cart2.find(it => it.title.includes('10mg'));
+  assert(tirz10 && tirz10.quantity === 1, 'Quantity reduced to 1x', `Actual: ${tirz10?.quantity}`);
+  assert(res.productCards === undefined, 'No product cards shown on quantity decrement');
+
+  // TEST 17: Compound Swap ("tirz 10 mg update kardo 60 mg akrdoo")
+  console.log('\n--- Step 17: Compound Swap ("tirz 10 mg update kardo 60 mg akrdoo") ---');
+  res = await ConversationEngine.processMessage({
+    conversationId: convId2,
+    message: 'tirz 10 mg update kardo 60 mg akrdoo',
+    tenant
+  });
+  cart2 = ConversationEngine.getSessionCart(convId2);
+  const tirz60 = cart2.find(it => it.title.includes('60mg'));
+  const oldTirz10 = cart2.find(it => it.title.includes('10mg'));
+  assert(tirz60 !== undefined && oldTirz10 === undefined, 'Successfully swapped Tirz 10mg for Tirz 60mg');
+  assert(res.productCards === undefined, 'Zero product cards shown on swap');
+
+  // TEST 18: Contextual Add ("khud akrdo add" / "afd akrdoo")
+  console.log('\n--- Step 18: Contextual Add ("khud akrdo add") ---');
+  const convId3 = `test_conv_ctx_${Date.now()}`;
+  // User asks about semaglutide
+  await ConversationEngine.processMessage({
+    conversationId: convId3,
+    message: 'semaglutide 10mg dikhao',
+    tenant
+  });
+  // User then says: "khud akrdo add"
+  res = await ConversationEngine.processMessage({
+    conversationId: convId3,
+    message: 'khud akrdo add',
+    tenant
+  });
+  let cart3 = ConversationEngine.getSessionCart(convId3);
+  assert(cart3.some(it => it.title.toLowerCase().includes('semaglutide')), 'Contextually added Semaglutide from previous turn');
+  assert(res.cartAction && res.cartAction.type === 'add', 'Cart action emitted for contextual add');
+
   console.log('\n================================================================');
   if (allPassed) {
-    console.log('🎉 ALL 12 VERIFICATION TESTS PASSED WITH 100% ACCURACY!');
+    console.log('🎉 ALL 18 VERIFICATION TESTS PASSED WITH 100% ACCURACY!');
   } else {
     console.error('❌ SOME TESTS FAILED. PLEASE REVIEW OUTPUT ABOVE.');
   }
