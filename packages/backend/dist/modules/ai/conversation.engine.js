@@ -320,6 +320,9 @@ export class ConversationEngine {
         if (isAddIntent && validAddCandidate) {
             return { action: 'ADD', targetProduct: validAddCandidate, quantity: parsedQty };
         }
+        if (isAddWord && !validAddCandidate && !isBudgetAsk && !isCatalogInquiry) {
+            return { action: 'ADD', targetProduct: undefined, quantity: parsedQty };
+        }
         // 10. VIEW CART INTENT (Strictly only when viewing, NOT when adding!)
         // Matches: "mere cart mai kya hai", "cart dikhao", "hua nhin likn cart mai kam", "show my cart"
         const isViewCart = !isAddWord && (/\b(mere\s*cart|my\s*cart|view\s*cart|show\s*cart|cart\s*dikhao|cart\s*check|cart\s*dekh|kitnay\s*product|kon\s*kon\s*sa\b.*\bproduct)\b/i.test(msgLower) ||
@@ -1428,6 +1431,11 @@ OUR LIVE CATALOG & EXACT PRICES:
 ${productListText || 'No products listed.'}
 
 CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
+0. CORE AGENTIC PRINCIPLE (INTENT-FIRST AUTONOMOUS ACTION):
+   - DEEPLY COMPREHEND USER INTENT: Read beyond literal words and rigid keywords. Discern what the user truly wants to achieve (shopping, comparing, budget match, modifying cart, tracking, checkout), regardless of typos, colloquial slang, Roman Urdu ("ghuma phera ke bolen"), or foreign languages.
+   - ACT AUTONOMOUSLY ON THEIR BEHALF: When the user's intent is clear, execute decisive actions (add, remove, update quantity, swap, clear, checkout) on their behalf using <cart_action> tags and direct links. Never force the user to perform manual steps or navigate away to do simple cart operations.
+   - ASK POLITE CLARIFYING QUESTIONS WHEN UNCLEAR (ZERO ASSUMPTIONS): If the user's intent or the specific product/dosage is ambiguous, vague, or incomplete, DO NOT guess or pick random products. Act like a polite, human customer support specialist and ask a friendly clarifying question so the user can guide you.
+
 1. STRICT DOMAIN BOUNDARY:
    - You are ONLY permitted to talk about ${companyName}, research peptides, diluents (Bacteriostatic Water), pricing, availability, orders, and shipping.
    - If the user asks anything outside this domain (politics, programming, homework, random questions, recipes), politely decline:
