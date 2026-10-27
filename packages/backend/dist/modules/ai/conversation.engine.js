@@ -982,7 +982,54 @@ export class ConversationEngine {
                     return msgLower.includes(titleLower);
                 });
             }
-            if (!targetItem && sessionItems.length > 0) {
+            const desiredProduct = semanticIntent.targetProduct || matchedStoreProduct;
+            // If user specified a product (e.g. "tirz 10 mg ki qty 7 kardoo") that is NOT currently in cart,
+            // treat this as an ADD command with that specific quantity! NEVER update an unrelated item in cart!
+            if (!targetItem && desiredProduct) {
+                const qtyToAdd = parsedQty || 1;
+                ConversationEngine.addToSessionCart(conversationId, {
+                    id: desiredProduct.id,
+                    title: desiredProduct.title,
+                    price: desiredProduct.price.regular,
+                    quantity: qtyToAdd
+                });
+                if (adapter.addToCart) {
+                    adapter.addToCart(desiredProduct.id, undefined, qtyToAdd, { shopperSessionId: input.shopperSessionId }).catch(() => { });
+                }
+                const sessionItemsUpdated = ConversationEngine.getSessionCart(conversationId);
+                const subtotal = sessionItemsUpdated.reduce((acc, it) => acc + (it.price * it.quantity), 0);
+                const msg = isUrduLang
+                    ? `✅ **${desiredProduct.title}** (${qtyToAdd}x) kamyabi se aapke cart mein **ADD** kar diya gaya hai!\n\n` +
+                        `💵 **Estimated Subtotal**: $${subtotal.toFixed(2)}\n\n` +
+                        `🔗 [View Full Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)`
+                    : `✅ **${desiredProduct.title}** (${qtyToAdd}x) has been successfully ADDED to your cart!\n\n` +
+                        `💵 **Estimated Subtotal**: $${subtotal.toFixed(2)}\n\n` +
+                        `🔗 [View Full Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)`;
+                const response = {
+                    conversationId,
+                    role: 'assistant',
+                    message: msg,
+                    productCards: [desiredProduct],
+                    cartAction: {
+                        type: 'add',
+                        item: {
+                            id: desiredProduct.id,
+                            title: desiredProduct.title,
+                            price: desiredProduct.price.regular,
+                            quantity: qtyToAdd
+                        }
+                    },
+                    quickReplies: [
+                        { label: 'Proceed to Checkout', actionText: 'Go to checkout' },
+                        { label: 'View Full Cart', actionText: 'Show my cart' },
+                        { label: 'Empty Cart', actionText: 'Clear cart' }
+                    ]
+                };
+                this.recordTurn(conversationId, trimmedMessage, msg);
+                return response;
+            }
+            // ONLY if user did NOT specify any product at all (e.g. just said "qty 7 kardo"), fall back to last item in cart:
+            if (!targetItem && !desiredProduct && sessionItems.length > 0) {
                 targetItem = sessionItems[sessionItems.length - 1];
             }
             if (targetItem) {

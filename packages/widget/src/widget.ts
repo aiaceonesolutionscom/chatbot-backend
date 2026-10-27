@@ -146,32 +146,7 @@ export class UniversalCommerceWidget {
       ? rawLogo
       : 'https://colbolt.hawksnfox.com/wp-content/uploads/2021/05/colbol.png';
 
-    const fallbackSvg = `
-      <svg viewBox="0 0 48 48" style="width:100%;height:100%;display:block;" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="cGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#0284c7" />
-            <stop offset="50%" stop-color="#16408a" />
-            <stop offset="100%" stop-color="#07152b" />
-          </linearGradient>
-          <linearGradient id="neonGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-            <stop offset="0%" stop-color="#38bdf8" />
-            <stop offset="100%" stop-color="#10b981" />
-          </linearGradient>
-        </defs>
-        <rect width="48" height="48" rx="24" fill="url(#cGrad)" />
-        <polygon points="24,10 35,16 35,29 24,35 13,29 13,16" stroke="url(#neonGrad)" stroke-width="2" fill="none" opacity="0.85" />
-        <circle cx="24" cy="10" r="2.5" fill="#38bdf8" />
-        <circle cx="35" cy="16" r="2.5" fill="#38bdf8" />
-        <circle cx="35" cy="29" r="2.5" fill="#10b981" />
-        <circle cx="24" cy="35" r="2.5" fill="#10b981" />
-        <circle cx="13" cy="29" r="2.5" fill="#38bdf8" />
-        <circle cx="13" cy="16" r="2.5" fill="#38bdf8" />
-        <path d="M28 18C26.5 17 24.5 17 23 18C20 20 20 25 23 27C24.5 28 26.5 28 28 27" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" fill="none" />
-      </svg>
-    `.replace(/\n\s*/g, '');
-
-    return `<img src="${logoUrl}" alt="Colbolt" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;background:#ffffff;" onerror="this.outerHTML='${fallbackSvg}';">`;
+    return `<img src="${logoUrl}" alt="Colbolt" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;background:#ffffff;">`;
   }
 
   private getTimeString(): string {
@@ -1024,8 +999,8 @@ export class UniversalCommerceWidget {
       return `<div class="subtotal-highlight-badge"><span class="subtotal-icon">💵</span><span class="subtotal-text">Estimated Subtotal: <strong>${price}</strong></span></div>`;
     });
 
-    // 3. Process Markdown Links: [label](url) -> Standout Action Buttons
-    out = out.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, (_match, rawLabel, rawUrl) => {
+    // 3. Process Markdown Links: [label](url) -> Standout Action Buttons (consumes any leading emoji)
+    out = out.replace(/(?:(?:🔗|💳|📦)\s*)?\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/gu, (_match, rawLabel, rawUrl) => {
       const url = rawUrl.trim();
       const label = rawLabel.trim();
       const lowerUrl = url.toLowerCase();
@@ -1033,45 +1008,28 @@ export class UniversalCommerceWidget {
 
       // Standout Checkout Action Button
       if (lowerUrl.includes('checkout') || lowerLabel.includes('checkout')) {
-        return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-action-btn chat-checkout-btn">
-          <span class="btn-icon">💳</span>
-          <span class="btn-text">${label}</span>
-          <span class="btn-arrow">➔</span>
-        </a>`;
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-action-btn chat-checkout-btn"><span class="btn-icon">💳</span><span class="btn-text">${label}</span><span class="btn-arrow">➔</span></a>`;
       }
 
       // Standout Cart Action Button
       if (lowerUrl.includes('cart') || lowerLabel.includes('cart') || lowerLabel.includes('basket')) {
-        return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-action-btn chat-cart-btn">
-          <span class="btn-icon">🛒</span>
-          <span class="btn-text">${label}</span>
-          <span class="btn-arrow">➔</span>
-        </a>`;
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-action-btn chat-cart-btn"><span class="btn-icon">🛒</span><span class="btn-text">${label}</span><span class="btn-arrow">➔</span></a>`;
       }
 
       // Standout Order Tracking Action Button
       if (lowerUrl.includes('order') || lowerUrl.includes('track') || lowerLabel.includes('order') || lowerLabel.includes('track')) {
-        return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-action-btn chat-track-btn">
-          <span class="btn-icon">📦</span>
-          <span class="btn-text">${label}</span>
-          <span class="btn-arrow">➔</span>
-        </a>`;
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-action-btn chat-track-btn"><span class="btn-icon">📦</span><span class="btn-text">${label}</span><span class="btn-arrow">➔</span></a>`;
       }
 
       // Standard Inline Link
       return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-inline-link">${label} <span class="ext-icon">↗</span></a>`;
     });
 
-    // 4. Auto-link standalone naked URLs (not inside an href)
-    out = out.replace(/(?<!href=["'])(https?:\/\/[a-zA-Z0-9_\-\.\/]+(?:\?[a-zA-Z0-9_\-=&%]+)?)/g, (url) => {
-      return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-inline-link">${url} <span class="ext-icon">↗</span></a>`;
-    });
-
-    // 5. Clean Bullet Lists
+    // 4. Clean Bullet Lists
     out = out.replace(/^[•\-\*]\s+(.*)$/gm, '<li>$1</li>');
     out = out.replace(/((?:<li>.*<\/li>\s*)+)/g, '<ul>$1</ul>');
 
-    // 6. Paragraphs and Linebreaks
+    // 5. Paragraphs and Linebreaks
     const paragraphs = out.split(/\n\s*\n/);
     out = paragraphs.map(p => {
       const trimmed = p.trim();

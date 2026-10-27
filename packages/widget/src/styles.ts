@@ -526,15 +526,17 @@ export function getWidgetStyles(primaryColor: string = '#0d2958', position: 'bot
     }
 
     .chat-action-btn {
-      display: inline-flex;
+      display: flex;
+      width: 100%;
       align-items: center;
       justify-content: space-between;
       gap: 10px;
-      padding: 10px 18px;
-      border-radius: 30px;
+      padding: 11px 18px;
+      margin: 8px 0;
+      border-radius: 24px;
       text-decoration: none;
       font-weight: 700;
-      font-size: 13px;
+      font-size: 13.5px;
       letter-spacing: -0.1px;
       cursor: pointer;
       transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
