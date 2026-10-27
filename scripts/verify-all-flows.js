@@ -450,9 +450,72 @@ async function runTestSuite() {
   assert(semaItem && semaItem.quantity === 2, 'Semaglutide 10mg added with quantity 2x without being hijacked by SET_QTY');
   assert(res.cartAction && res.cartAction.type === 'add', 'Emitted cart action add for Semaglutide');
 
+  // TEST 34: English Catalog Discovery ("i want to add a product but i didnt know what you have?")
+  console.log('\n--- Step 34: English Catalog Discovery ("i want to add a product but i didnt know what you have?") ---');
+  const convIdDisc = `test_conv_disc_${Date.now()}`;
+  res = await ConversationEngine.processMessage({
+    conversationId: convIdDisc,
+    message: 'i want to add a product but i didnt know what you have?',
+    tenant
+  });
+  const discCart = ConversationEngine.getSessionCart(convIdDisc);
+  assert(discCart.length === 0, 'Cart remains empty; did NOT blindly add a product to cart!');
+  assert(!res.cartAction, 'No cart action emitted on catalog inquiry');
+  assert(res.productCards && res.productCards.length > 0, 'Displays all catalog product cards');
+  assert(res.message.includes('live catalog') || res.message.includes('Colbolt provides'), 'Offers helpful discovery message in English');
+
+  // TEST 35: Compound Swap with Typo ("tirz 60 mg ko hata do ro iski jagah bacteriostatic water add akrdo")
+  console.log('\n--- Step 35: Compound Swap with Typo ("tirz 60 mg ko hata do ro iski jagah bacteriostatic water add akrdo") ---');
+  const convIdSwapTypo = `test_conv_swaptypo_${Date.now()}`;
+  // Setup cart with Tirz 60mg and Tirz 10mg
+  ConversationEngine.syncSessionCart(convIdSwapTypo, [
+    { id: '7090', title: 'Tirz 60mg', price: 675, quantity: 1 },
+    { id: '7088', title: 'Tirz 10mg', price: 150, quantity: 1 }
+  ]);
+  res = await ConversationEngine.processMessage({
+    conversationId: convIdSwapTypo,
+    message: 'tirz 60 mg ko hata do ro iski jagah bacteriostatic water add akrdo',
+    tenant
+  });
+  const swapCart = ConversationEngine.getSessionCart(convIdSwapTypo);
+  const hasNo60 = !swapCart.some(i => i.title.includes('60mg'));
+  const hasAddedWater = swapCart.some(i => i.title.toLowerCase().includes('water'));
+  const hasPreserved10 = swapCart.some(i => i.title.includes('10mg'));
+  assert(hasNo60, 'Tirz 60mg was removed from cart');
+  assert(hasAddedWater, 'Bacteriostatic Water was added to cart in same turn');
+  assert(hasPreserved10, 'Tirz 10mg was preserved in cart without accidental clearing');
+  assert(res.cartAction && res.cartAction.type === 'add', 'Emitted real cart action for newly added item');
+  assert(res.message.includes('Tirz 60mg') && (res.message.includes('Bacteriostatic Water') || res.message.includes('Water')), 'Message confirms both removal and addition');
+
+  // TEST 36: Multilingual Spanish Discovery ("hola quiero comprar pero no se que tienen")
+  console.log('\n--- Step 36: Multilingual Spanish Discovery ("hola quiero comprar pero no se que tienen") ---');
+  const convIdEs = `test_conv_es_${Date.now()}`;
+  res = await ConversationEngine.processMessage({
+    conversationId: convIdEs,
+    message: 'hola quiero comprar pero no se que tienen',
+    tenant
+  });
+  assert(ConversationEngine.getSessionCart(convIdEs).length === 0, 'Spanish discovery does NOT blindly add items to cart');
+  assert(res.productCards && res.productCards.length > 0, 'Offers full catalog in Spanish');
+
+  // TEST 37: Multilingual Spanish Swap ("quita tirz 60mg y pon bacteriostatic water")
+  console.log('\n--- Step 37: Multilingual Spanish Swap ("quita tirz 60mg y pon bacteriostatic water") ---');
+  ConversationEngine.syncSessionCart(convIdEs, [
+    { id: '7090', title: 'Tirz 60mg', price: 675, quantity: 1 }
+  ]);
+  res = await ConversationEngine.processMessage({
+    conversationId: convIdEs,
+    message: 'quita tirz 60mg y pon bacteriostatic water',
+    tenant
+  });
+  const esCart = ConversationEngine.getSessionCart(convIdEs);
+  assert(!esCart.some(i => i.title.includes('60mg')), 'Tirz 60mg was removed via Spanish');
+  assert(esCart.some(i => i.title.toLowerCase().includes('water')), 'Bacteriostatic Water was added via Spanish');
+  assert(res.message.includes('eliminado') || res.message.includes('añadido') || res.message.includes('Water'), 'Spanish confirmation formulated');
+
   console.log('\n================================================================');
   if (allPassed) {
-    console.log('🎉 ALL 33 VERIFICATION TESTS PASSED WITH 100% ACCURACY!');
+    console.log('🎉 ALL 37 VERIFICATION TESTS PASSED WITH 100% ACCURACY!');
   } else {
     console.error('❌ SOME TESTS FAILED. PLEASE REVIEW OUTPUT ABOVE.');
   }

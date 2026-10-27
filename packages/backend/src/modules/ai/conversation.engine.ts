@@ -383,18 +383,31 @@ export class ConversationEngine {
       return { action: 'REMOVE', targetProduct, quantity: 1 };
     }
 
+    // 0. CATALOG & INVENTORY DISCOVERY GUARD (MUST NEVER BE HIJACKED BY ADD TO CART!)
+    // Matches: "i want to add a product but i didnt know what you have?", "what do you have?", "apke pas kya hai", "kia bechtay ho", "que tienen"
+    const isCatalogInquiry = 
+      /\b(what\s*(do\s*you|you|can\s*i)\s*have|didn'?t\s*know\s*what\s*you\s*have|don'?t\s*know\s*what\s*you\s*have|not\s*sure\s*what\s*you\s*have|what\s*(are\s*your\s*products|do\s*you\s*sell)|show\s*(me\s*)?(products?|catalog|what\s*you\s*have)|what\s*(can\s*i\s*add|are\s*the\s*options))\b/i.test(msgLower) ||
+      /\b(kya\s*(bechtay|sell|hai|rakhtay|available)|kia\s*(bechtay|sell|hai|rakhtay|available)|apke\s*pas\s*(kia|kya)|tumharay\s*pas\s*(kia|kya)|app\s*kia\s*kai\s*bechtay)\b/i.test(msgLower) ||
+      /\b(que\s*tienen|que\s*tienes|cuales\s*productos|que\s*venden)\b/i.test(msgLower);
+
+    if (isCatalogInquiry) {
+      return { action: 'NONE', quantity: 0 };
+    }
+
     // 9. ADD TO CART INTENT (MUST NOT be triggered as VIEW_CART)
     // Matches: "tirz 10 mg add akroo cart mai", "1 or add akrdoo", "bacteriostatic water add kardo", "ye dalo basket mai"
-    const isAddWord = /\b(add|dalo|daal|daalo|shamil|pack|bhej\s*do|bhejo|de\s*do|dedo|lena\s*hai|khareedna|kharidna|mangwana|order\s*karo|basket\s*mai|khud\s*akrdo|a[fd]+|1\s*or|ek\s*aur|aik\s*aur)\b/i.test(msgLower);
-    const isDesirePhrase = /\b(chahiye|mujhay\s*chahiye|yehi\s*chahiye|yehi\s*dedo|yehi\s*bhej\s*do|lena\s*chahta)\b/i.test(msgLower);
+    const isAddWord = /\b(add|dalo|daal|daalo|shamil|pack|bhej\s*do|bhejo|de\s*do|dedo|lena\s*hai|khareedna|kharidna|mangwana|order\s*karo|basket\s*mai|khud\s*akrdo|a[fd]+|1\s*or|ek\s*aur|aik\s*aur|agrega\w*|anade|anadir|pon)\b/i.test(msgLower);
+    const isDesirePhrase = /\b(chahiye|mujhay\s*chahiye|yehi\s*chahiye|yehi\s*dedo|yehi\s*bhej\s*do|lena\s*chahta|quiero)\b/i.test(msgLower);
     const isBudgetAsk = /\b(budget|\$|dollar|sasta|chhota|kam price|under)\b/i.test(msgLower);
-    const hasAddVerb = (isAddWord || /\bakrdoo?\b/i.test(msgLower) || /\bkardo\b/i.test(msgLower)) && !isBudgetAsk;
+    const isContextAddPhrase = /\b(khud\s*akrdo|khud\s*add|ye\s*add|yeh\s*add|isko\s*(add|dalo)|add\s*(this|it)|put\s*it|take\s*it|1\s*or|ek\s*aur|aik\s*aur|one\s*more|add\s*more|another)\b/i.test(msgLower);
+    const validAddCandidate = targetProduct || (isContextAddPhrase ? (lastProduct || lastCartProd) : undefined);
+
     const isAddIntent = 
-      ((isAddWord && (!!productCandidate || /\b(cart|basket|it|yeh|ye|woh|wo)\b/i.test(msgLower))) ||
-      (isDesirePhrase && !!productCandidate && !/\b(policy|shipping|info|kya|kia|price|qeemat)\b/i.test(msgLower)) ||
-      (!!targetProduct && /\b(akrdoo|kardo|kar\s*do|bhejo|dalo|lena)\b/i.test(msgLower))) && !isBudgetAsk;
-    if (isAddIntent && productCandidate) {
-      return { action: 'ADD', targetProduct: productCandidate, quantity: parsedQty };
+      ((isAddWord && (!!validAddCandidate || /\b(cart|basket|it|yeh|ye|woh|wo)\b/i.test(msgLower))) ||
+      (isDesirePhrase && !!validAddCandidate && !/\b(policy|shipping|info|kya|kia|price|qeemat)\b/i.test(msgLower)) ||
+      (!!targetProduct && /\b(akrdoo|kardo|kar\s*do|bhejo|dalo|lena|agrega|pon)\b/i.test(msgLower))) && !isBudgetAsk;
+    if (isAddIntent && validAddCandidate) {
+      return { action: 'ADD', targetProduct: validAddCandidate, quantity: parsedQty };
     }
 
     // 10. VIEW CART INTENT (Strictly only when viewing, NOT when adding!)
@@ -608,14 +621,18 @@ export class ConversationEngine {
 
     // 2A_COMPOUND. COMPOUND INTENT: REMOVE ONE ITEM & ADD ANOTHER / BUDGET ITEM
     // E.g. "acha tirz 30 mg hata do or 15 dollar ka kuch add akroo kia hai tumharay apas 15 dollar ka"
-    // E.g. "tirz 30 hata do aur semaglutide 10 add kardo"
-    const hasRemoveVerb = /\b(hata|hatao|remove|nikaal|nikal|drop|chhor|chhoro|discard)\b/i.test(msgLower);
-    const hasAddOrBudgetVerb = /\b(aur|or|and|\+)\b.*\b(add|dalo|daal|shamil|lena|dedo|bhejo|dollar|\$|budget)\b/i.test(msgLower);
+    // E.g. "tirz 60 mg ko hata do ro iski jagah bacteriostatic water add akrdo"
+    // E.g. "remove tirz 60mg and in its place add bacteriostatic water"
+    const hasRemoveVerb = /\b(hata\w*|nikaal\w*|nikal\w*|remove\w*|delete\w*|drop|discard|chhor\w*|chhod\w*|quita\w*|elimina\w*)\b/i.test(msgLower);
+    const hasSwapOrAddVerb = 
+      /\b(aur|or|ro|and|nd|y|\+)\b.*\b(add|dalo|daal|shamil|lena|dedo|bhejo|dollar|\$|budget|pon|agrega\w*)\b/i.test(msgLower) ||
+      /\b(ki\s*jagah|iski\s*jagah|uski\s*jagah|ke\s*badle|ke\s*bajaye|instead\s*of|in\s*place\s*of|en\s*lugar\s*de|replace\s*with|swap\s*with)\b/i.test(msgLower);
 
-    if (hasRemoveVerb && hasAddOrBudgetVerb && currentSessionItems.length > 0) {
-      const parts = msgLower.split(/\b(?:aur|or|and|\+)\b/i);
-      const removePart = parts.find(p => /\b(hata|remove|nikaal|nikal|drop|chhor)\b/i.test(p)) || parts[0];
-      const addPart = parts.find(p => p !== removePart) || parts[1] || '';
+    if (hasRemoveVerb && hasSwapOrAddVerb && currentSessionItems.length > 0) {
+      const parts = msgLower.split(/\b(?:aur|or|ro|and|nd|y|ki\s*jagah|iski\s*jagah|uski\s*jagah|ke\s*badle|ke\s*bajaye|instead\s*of|in\s*place\s*of|en\s*lugar\s*de|replace\s*with|swap\s*with|\+)\b/i);
+      const validParts = parts.map(p => p.trim()).filter(p => p.length > 0);
+      const removePart = validParts.find(p => /\b(hata|remove|nikaal|nikal|drop|chhor|quita|elimina)\b/i.test(p)) || validParts[0];
+      const addPart = validParts.find(p => p !== removePart) || '';
 
       // 1. Resolve item to remove
       let itemToRemoveCandidate = ConversationEngine.resolveProductFromMessage(removePart, storeProducts);
@@ -684,13 +701,22 @@ export class ConversationEngine {
         cartListing = '\n\nAapka cart ab khali hai.';
       }
 
-      const msg = isUrduLang
-        ? `✅ **${remTitle}** cart se remove kar diya gaya hai.\n` +
-          (itemToAddCandidate ? `✅ **${itemToAddCandidate.title}** (1x) aapke cart mein **ADD** kar diya gaya hai!\n${budgetNotice}` : '') +
-          cartListing
-        : `✅ **${remTitle}** has been removed from your cart.\n` +
+      const isSpanishLang = /\b(hola|quiero|productos?|carrito|cuanto|cuesta|por\s*favor|gracias|anadir|agrega|eliminar|quitar|cambiar|reemplazar|pagar|vaciar|tienen|tienes|puedo|ayuda)\b/i.test(msgLower);
+
+      let msg = '';
+      if (isUrduLang) {
+        msg = `✅ **${remTitle}** aapke shopping cart se remove kar diya gaya hai.\n\n` +
+          (itemToAddCandidate ? `✅ **${itemToAddCandidate.title}** (1x) kamyabi se aapke cart mein **ADD** kar diya gaya hai!\n${budgetNotice}` : '') +
+          cartListing;
+      } else if (isSpanishLang) {
+        msg = `✅ **${remTitle}** ha sido eliminado de tu carrito.\n\n` +
+          (itemToAddCandidate ? `✅ ¡**${itemToAddCandidate.title}** (1x) ha sido añadido con éxito a tu carrito!\n` : '') +
+          cartListing;
+      } else {
+        msg = `✅ **${remTitle}** has been removed from your shopping cart.\n\n` +
           (itemToAddCandidate ? `✅ **${itemToAddCandidate.title}** (1x) has been successfully ADDED to your cart!\n${budgetNotice}` : '') +
           cartListing;
+      }
 
       const response: ChatResponse = {
         conversationId,
@@ -717,6 +743,36 @@ export class ConversationEngine {
         ]
       };
       this.recordTurn(conversationId, trimmedMessage, msg);
+      return response;
+    }
+
+    // 2A_DISCOVERY. CATALOG & PRODUCT INQUIRY HANDLER
+    // Matches: "i want to add a product but i didnt know what you have?", "what do you have?", "apke pas kya hai", "app kia kaibechtay hoo", "que tienen?"
+    const isCatalogInquiry = 
+      /\b(what\s*(do\s*you|you|can\s*i)\s*have|didn'?t\s*know\s*what\s*you\s*have|don'?t\s*know\s*what\s*you\s*have|not\s*sure\s*what\s*you\s*have|what\s*(are\s*your\s*products|do\s*you\s*sell)|show\s*(me\s*)?(products?|catalog|what\s*you\s*have)|what\s*(can\s*i\s*add|are\s*the\s*options))\b/i.test(msgLower) ||
+      /\b(kya\s*(bechtay|sell|hai|rakhtay|available)|kia\s*(bechtay|sell|hai|rakhtay|available)|apke\s*pas\s*(kia|kya)|tumharay\s*pas\s*(kia|kya)|app\s*kia\s*kai\s*bechtay)\b/i.test(msgLower) ||
+      /\b(que\s*tienen|que\s*tienes|cuales\s*productos|que\s*venden)\b/i.test(msgLower);
+
+    if (isCatalogInquiry) {
+      const isSpanishLang = /\b(hola|quiero|productos?|carrito|cuanto|cuesta|por\s*favor|gracias|anadir|agrega|eliminar|quitar|cambiar|reemplazar|pagar|vaciar|tienen|tienes|puedo|ayuda)\b/i.test(msgLower);
+      const catMsg = isUrduLang
+        ? `Colbolt par hum certified research-grade compounds aur peptides provide karte hain. Neeche hamara live catalog dastyab hai, jahan aap products dekh sakte hain, prices check kar sakte hain, aur seedha 'Add to Cart' kar sakte hain:`
+        : isSpanishLang
+          ? `Colbolt ofrece compuestos y péptidos certificados de grado de investigación de laboratorio. A continuación puedes explorar nuestro catálogo en vivo, verificar precios y añadir directamente a tu carrito:`
+          : `Colbolt provides certified research-grade compounds, peptides, and laboratory solutions. Below is our live catalog where you can explore our products, check prices, and add items directly to your cart:`;
+
+      const response: ChatResponse = {
+        conversationId,
+        role: 'assistant',
+        message: catMsg,
+        productCards: storeProducts,
+        quickReplies: [
+          { label: 'View Full Cart', actionText: 'Show my cart' },
+          { label: 'Shipping Info', actionText: 'What is your shipping policy?' },
+          { label: `About ${companyName}`, actionText: `What does ${companyName} do?` }
+        ]
+      };
+      this.recordTurn(conversationId, trimmedMessage, catMsg);
       return response;
     }
 
