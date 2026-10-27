@@ -1,7 +1,7 @@
 /**
  * Storefront Cart Bridge
- * Executes verified cart additions directly in the customer's active browser session
- * and dispatches WooCommerce DOM events so theme cart counters update in real-time.
+ * Executes verified cart additions, removals, and updates directly in the customer's active browser session
+ * and directly refreshes WooCommerce DOM fragments, header badges, and theme mini-cart widgets live.
  */
 
 export interface CartBridgeResult {
@@ -65,39 +65,106 @@ export class WooCommerceStorefrontBridge {
     return null;
   }
 
+  /**
+   * Directly replaces HTML fragments returned by WooCommerce into the page DOM
+   * and synchronously updates header cart count badges and mini-cart contents.
+   */
+  public static async applyFragmentsAndUpdateDOM(fragments?: Record<string, string>, cartHash?: string): Promise<void> {
+    if (typeof document === 'undefined') return;
+
+    // 1. Replace all returned HTML fragments directly in the host page DOM
+    if (fragments && typeof fragments === 'object') {
+      for (const [selector, fragmentHtml] of Object.entries(fragments)) {
+        try {
+          const targets = document.querySelectorAll(selector);
+          targets.forEach(target => {
+            const temp = document.createElement('div');
+            temp.innerHTML = fragmentHtml.trim();
+            const newElement = temp.firstElementChild;
+            if (newElement && target.parentNode) {
+              target.parentNode.replaceChild(newElement, target);
+            }
+          });
+        } catch (e) {
+          // Ignore invalid selector errors safely
+        }
+      }
+    }
+
+    // 2. Fetch live cart items count to ensure absolute accuracy on header badges
+    let totalCount = 0;
+    try {
+      const liveItems = await this.fetchLiveCart();
+      if (liveItems && liveItems.length > 0) {
+        totalCount = liveItems.reduce((acc, it) => acc + (it.quantity || 1), 0);
+      }
+    } catch (e) {}
+
+    // 3. Directly update ALL header cart counters across themes (Uomo, Elementor, Storefront, etc.)
+    const countBadges = document.querySelectorAll(
+      '.cart .count, .apus-topcart .count, .footer-mini-cart .count, .mini-cart .count, .header-cart .count, .cart-count, span.count, .elementor-button-icon-qty'
+    );
+    countBadges.forEach(el => {
+      el.textContent = String(totalCount);
+    });
+
+    // 4. Trigger standard theme and WooCommerce jQuery events
+    this.triggerWooCommerceEvents({ fragments, cart_hash: cartHash }, 'added_to_cart');
+
+    // 5. If visitor is currently on /cart/ or /checkout/, trigger cart update
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname.toLowerCase();
+      if (path.includes('cart') || path.includes('checkout')) {
+        const win = window as any;
+        if (win.jQuery) {
+          win.jQuery(document.body).trigger('update_checkout');
+          win.jQuery(document.body).trigger('update_wc_div');
+        }
+      }
+    }
+  }
+
+  /**
+   * Fetches latest refreshed fragments from WooCommerce and applies them live into the DOM
+   */
+  public static async refreshAndApplyFragments(fallbackCount?: number): Promise<void> {
+    if (typeof window === 'undefined') return;
+    try {
+      const res = await fetch(`${window.location.origin}/?wc-ajax=get_refreshed_fragments`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        await this.applyFragmentsAndUpdateDOM(data?.fragments, data?.cart_hash);
+        return;
+      }
+    } catch (e) {
+      console.warn('[WooCommerceBridge] get_refreshed_fragments failed:', e);
+    }
+
+    // Fallback: manually update badges if get_refreshed_fragments fails
+    if (typeof fallbackCount === 'number') {
+      const countBadges = document.querySelectorAll(
+        '.cart .count, .apus-topcart .count, .footer-mini-cart .count, .mini-cart .count, .header-cart .count, .cart-count, span.count, .elementor-button-icon-qty'
+      );
+      countBadges.forEach(el => {
+        el.textContent = String(fallbackCount);
+      });
+    }
+  }
+
+  /**
+   * Executes verified cart addition in active browser session and updates website live
+   */
   static async executeCartAddition(
     productId: string | number, 
     quantity: number = 1,
     endpointUrl?: string
   ): Promise<CartBridgeResult> {
     if (this.isWpStorefront()) {
-      try {
-        const storeEndpoint = endpointUrl || `${window.location.origin}/wp-json/wc/store/v1/cart/add-item`;
-        const res = await fetch(storeEndpoint, {
-          method: 'POST',
-          headers: this.getHeaders(),
-          credentials: 'include', // Includes active WordPress cookie session
-          body: JSON.stringify({
-            id: Number(productId),
-            quantity
-          })
-        });
-
-        if (res.ok) {
-          const cartData = await res.json();
-          this.triggerWooCommerceEvents(cartData, 'added_to_cart');
-          return {
-            success: true,
-            message: `Added to cart!`,
-            cartCount: cartData?.items_count,
-            cartData
-          };
-        }
-      } catch (err) {
-        console.warn('[WooCommerceBridge] Direct Store API call failed, trying wc-ajax fallback:', err);
-      }
-
-      // Fallback: standard WooCommerce wc-ajax=add_to_cart form POST
+      // 1. First try standard WooCommerce wc-ajax=add_to_cart form POST
+      // Native WooCommerce endpoint returns HTML fragments and sets official session cookies!
       try {
         const formData = new FormData();
         formData.append('product_id', String(productId));
@@ -111,7 +178,7 @@ export class WooCommerceStorefrontBridge {
 
         if (ajaxRes.ok) {
           const ajaxData = await ajaxRes.json().catch(() => ({}));
-          this.triggerWooCommerceEvents(ajaxData, 'added_to_cart');
+          await this.applyFragmentsAndUpdateDOM(ajaxData?.fragments, ajaxData?.cart_hash);
           return {
             success: true,
             message: `Added to cart!`,
@@ -119,7 +186,34 @@ export class WooCommerceStorefrontBridge {
           };
         }
       } catch (e) {
-        console.error('[WooCommerceBridge] wc-ajax fallback error:', e);
+        console.warn('[WooCommerceBridge] wc-ajax add_to_cart error, trying Store API:', e);
+      }
+
+      // 2. Fallback: WooCommerce Store API
+      try {
+        const storeEndpoint = endpointUrl || `${window.location.origin}/wp-json/wc/store/v1/cart/add-item`;
+        const res = await fetch(storeEndpoint, {
+          method: 'POST',
+          headers: this.getHeaders(),
+          credentials: 'include',
+          body: JSON.stringify({
+            id: Number(productId),
+            quantity
+          })
+        });
+
+        if (res.ok) {
+          const cartData = await res.json();
+          await this.refreshAndApplyFragments(cartData?.items_count);
+          return {
+            success: true,
+            message: `Added to cart!`,
+            cartCount: cartData?.items_count,
+            cartData
+          };
+        }
+      } catch (err) {
+        console.warn('[WooCommerceBridge] Direct Store API call failed:', err);
       }
     }
 
@@ -132,12 +226,12 @@ export class WooCommerceStorefrontBridge {
   }
 
   /**
-   * Executes verified cart item removal directly in the WordPress session
+   * Executes verified cart item removal directly in the WordPress session and updates website live
    */
   static async executeCartRemoval(itemKeyOrProductId: string | number): Promise<CartBridgeResult> {
     if (this.isWpStorefront()) {
       try {
-        // 1. First fetch cart to find the specific item key
+        // 1. Fetch live cart to identify target item key
         const cartRes = await fetch(`${window.location.origin}/wp-json/wc/store/v1/cart`, {
           method: 'GET',
           headers: this.getHeaders(),
@@ -164,7 +258,7 @@ export class WooCommerceStorefrontBridge {
 
           if (removeRes.ok) {
             const updatedCart = await removeRes.json();
-            this.triggerWooCommerceEvents(updatedCart, 'removed_from_cart');
+            await this.refreshAndApplyFragments(updatedCart?.items_count);
             return {
               success: true,
               message: 'Item removed from cart!',
@@ -177,21 +271,26 @@ export class WooCommerceStorefrontBridge {
         console.warn('[WooCommerceBridge] Store API removal failed, trying fallback:', e);
       }
 
-      // Fallback: ajax remove_from_cart
+      // 3. Fallback: standard wc-ajax=remove_from_cart
       try {
         const formData = new FormData();
         formData.append('cart_item_key', String(itemKeyOrProductId));
-        await fetch(`${window.location.origin}/?wc-ajax=remove_from_cart`, {
+        const ajaxRes = await fetch(`${window.location.origin}/?wc-ajax=remove_from_cart`, {
           method: 'POST',
           credentials: 'include',
           body: formData
         });
+        if (ajaxRes.ok) {
+          const ajaxData = await ajaxRes.json().catch(() => ({}));
+          await this.applyFragmentsAndUpdateDOM(ajaxData?.fragments, ajaxData?.cart_hash);
+          return { success: true, message: 'Item removed from cart.' };
+        }
       } catch (e) {
         // Ignored
       }
     }
 
-    this.triggerWooCommerceEvents({ items_count: 0 }, 'removed_from_cart');
+    await this.refreshAndApplyFragments(0);
     return {
       success: true,
       message: 'Item removed from cart.'
@@ -199,7 +298,7 @@ export class WooCommerceStorefrontBridge {
   }
 
   /**
-   * Updates quantity of a specific item in WooCommerce session cart
+   * Updates quantity of a specific item in WooCommerce session cart and updates website live
    */
   static async executeCartUpdate(itemKeyOrProductId: string | number, quantity: number): Promise<CartBridgeResult> {
     if (quantity <= 0) {
@@ -233,7 +332,7 @@ export class WooCommerceStorefrontBridge {
 
           if (updateRes.ok) {
             const updatedCart = await updateRes.json();
-            this.triggerWooCommerceEvents(updatedCart, 'added_to_cart');
+            await this.refreshAndApplyFragments(updatedCart?.items_count);
             return {
               success: true,
               message: 'Cart updated successfully!',
@@ -247,7 +346,7 @@ export class WooCommerceStorefrontBridge {
       }
     }
 
-    this.triggerWooCommerceEvents({ items_count: quantity }, 'added_to_cart');
+    await this.refreshAndApplyFragments(quantity);
     return {
       success: true,
       message: 'Cart quantity updated.'
@@ -255,7 +354,7 @@ export class WooCommerceStorefrontBridge {
   }
 
   /**
-   * Clears all items in WooCommerce session cart
+   * Clears all items in WooCommerce session cart and updates website live
    */
   static async clearStoreCart(): Promise<void> {
     if (this.isWpStorefront()) {
@@ -266,6 +365,7 @@ export class WooCommerceStorefrontBridge {
             await this.executeCartRemoval(it.key);
           }
         }
+        await this.refreshAndApplyFragments(0);
       } catch (e) {
         console.warn('[WooCommerceBridge] clearStoreCart error:', e);
       }
@@ -281,6 +381,8 @@ export class WooCommerceStorefrontBridge {
       try {
         win.jQuery(document.body).trigger('wc_fragment_refresh');
         win.jQuery(document.body).trigger(eventType, [data?.fragments, data?.cart_hash]);
+        win.jQuery(document.body).trigger('wc_fragments_refreshed');
+        win.jQuery(document.body).trigger('wc_fragments_loaded');
         win.jQuery(document.body).trigger('update_checkout');
       } catch (e) {
         // Suppress any non-critical theme listener errors
@@ -292,8 +394,10 @@ export class WooCommerceStorefrontBridge {
       window.dispatchEvent(new CustomEvent('woocommerce:cart_updated', { detail: data }));
       document.body.dispatchEvent(new CustomEvent(eventType, { detail: data }));
       document.body.dispatchEvent(new CustomEvent('wc_fragment_refresh'));
+      document.body.dispatchEvent(new CustomEvent('wc_fragments_refreshed'));
     } catch (e) {
       // Ignored
     }
   }
 }
+
