@@ -114,8 +114,8 @@ export class UniversalCommerceWidget {
         brand: {
           companyName: 'Colbolt',
           assistantName: 'COLBOLT.',
-          logoUrl: this.customLogoUrl || `${this.apiUrl}/static/assistance.gif`,
-          primaryColor: '#16408a',
+          logoUrl: this.customLogoUrl || 'https://colbolt.hawksnfox.com/wp-content/uploads/2021/05/colbol.png',
+          primaryColor: '#0d2958',
           launcherPosition: 'bottom-right',
           welcomeMessage: 'Hello! Welcome to Colbolt. I can help you find products (like Bacteriostatic Water, Tirz, Retatrutide), check prices within your budget, or add items directly to your cart. How can I help you today?',
           suggestedQuestions: [
@@ -133,21 +133,45 @@ export class UniversalCommerceWidget {
         activeTools: ['search_products', 'add_to_cart', 'tile_calculator']
       };
     } else if (this.customLogoUrl) {
-      // Prioritize WordPress plugin-provided logo asset
-      this.config.brand.logoUrl = this.customLogoUrl;
+      // Prioritize clean WordPress logo asset
+      if (!this.customLogoUrl.includes('assistance.gif')) {
+        this.config.brand.logoUrl = this.customLogoUrl;
+      }
     }
   }
 
   private getAvatarHtml(size: number = 36): string {
-    const logoUrl = this.customLogoUrl || this.config?.brand?.logoUrl || `${this.apiUrl}/static/assistance.gif`;
-    if (logoUrl) {
-      return `<img src="${logoUrl}" alt="Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" onerror="this.onerror=null;this.src='${this.apiUrl}/static/assistance.gif';">`;
-    }
-    return `
-      <svg viewBox="0 0 24 24" style="width:${size * 0.6}px;height:${size * 0.6}px;fill:currentColor">
-        <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.72V7h2a7 7 0 0 1 7 7v1a3 3 0 0 1-3 3h-1.17l-2.41 2.41A2 2 0 0 1 14 21H10a2 2 0 0 1-1.41-.59L6.17 18H5a3 3 0 0 1-3-3v-1a7 7 0 0 1 7-7h2V5.72c-.6-.34-1-.98-1-1.72a2 2 0 0 1 2-2z"/>
+    const rawLogo = this.customLogoUrl || this.config?.brand?.logoUrl;
+    const logoUrl = (rawLogo && !rawLogo.includes('assistance.gif'))
+      ? rawLogo
+      : 'https://colbolt.hawksnfox.com/wp-content/uploads/2021/05/colbol.png';
+
+    const fallbackSvg = `
+      <svg viewBox="0 0 48 48" style="width:100%;height:100%;display:block;" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="cGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#0284c7" />
+            <stop offset="50%" stop-color="#16408a" />
+            <stop offset="100%" stop-color="#07152b" />
+          </linearGradient>
+          <linearGradient id="neonGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#38bdf8" />
+            <stop offset="100%" stop-color="#10b981" />
+          </linearGradient>
+        </defs>
+        <rect width="48" height="48" rx="24" fill="url(#cGrad)" />
+        <polygon points="24,10 35,16 35,29 24,35 13,29 13,16" stroke="url(#neonGrad)" stroke-width="2" fill="none" opacity="0.85" />
+        <circle cx="24" cy="10" r="2.5" fill="#38bdf8" />
+        <circle cx="35" cy="16" r="2.5" fill="#38bdf8" />
+        <circle cx="35" cy="29" r="2.5" fill="#10b981" />
+        <circle cx="24" cy="35" r="2.5" fill="#10b981" />
+        <circle cx="13" cy="29" r="2.5" fill="#38bdf8" />
+        <circle cx="13" cy="16" r="2.5" fill="#38bdf8" />
+        <path d="M28 18C26.5 17 24.5 17 23 18C20 20 20 25 23 27C24.5 28 26.5 28 28 27" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" fill="none" />
       </svg>
-    `;
+    `.replace(/\n\s*/g, '');
+
+    return `<img src="${logoUrl}" alt="Colbolt" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;background:#ffffff;" onerror="this.outerHTML='${fallbackSvg}';">`;
   }
 
   private getTimeString(): string {
@@ -157,7 +181,7 @@ export class UniversalCommerceWidget {
 
   private render(): void {
     const brand = this.config?.brand;
-    const primaryColor = brand?.primaryColor || '#1e73be';
+    const primaryColor = brand?.primaryColor || '#0d2958';
     const position = brand?.launcherPosition || 'bottom-right';
     const companyName = brand?.companyName || 'Colbolt';
     const assistantName = brand?.assistantName || 'COLBOLT.';
@@ -179,7 +203,7 @@ export class UniversalCommerceWidget {
         </div>
         <div class="launcher-text-wrap">
           <div class="launcher-headline">
-            <span class="launcher-title">${this.escapeHtml(assistantName || 'Colt AI')}</span>
+            <span class="launcher-title">${this.escapeHtml(assistantName || 'COLBOLT AI')}</span>
             <span class="launcher-pill-status">● Live</span>
           </div>
           <div class="launcher-sub">Order & Research Specialist</div>
@@ -188,16 +212,16 @@ export class UniversalCommerceWidget {
 
       <!-- Chat Window -->
       <div class="chat-window hidden" id="chatWindow">
-        <!-- Branded Gradient Banner Header (YANA Style) -->
+        <!-- Branded Gradient Banner Header -->
         <div class="chat-header-banner">
           <div class="banner-brand-info">
             <div class="banner-mascot">
               ${this.getAvatarHtml(52)}
             </div>
             <div class="banner-text-group">
-              <span class="banner-greeting">Hi, I am</span>
+              <span class="banner-greeting">Verified Assistant</span>
               <span class="banner-assistant-name">${this.escapeHtml(assistantName)}</span>
-              <span class="banner-tagline">Research Concierge & Support</span>
+              <span class="banner-tagline"><span class="banner-tagline-dot"></span> Research Concierge • Online</span>
             </div>
           </div>
           <div class="banner-controls">
@@ -989,14 +1013,75 @@ export class UniversalCommerceWidget {
   }
 
   private formatMarkdown(str: string): string {
+    if (!str) return '';
     let out = this.escapeHtml(str);
-    // Bold
+
+    // 1. Process Markdown Bold: **text**
     out = out.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    // Bullets
+
+    // 2. Process Highlighted Subtotal Banner: 💵 **Estimated Subtotal**: $... or 💵 Estimated Subtotal: $...
+    out = out.replace(/💵\s*(?:<strong>)?(?:Estimated\s*Subtotal|Updated\s*Total)(?:<\/strong>)?:\s*(?:<strong>)?(\$[\d,.]+(?:\.\d{2})?)(?:<\/strong>)?/gi, (_match, price) => {
+      return `<div class="subtotal-highlight-badge"><span class="subtotal-icon">💵</span><span class="subtotal-text">Estimated Subtotal: <strong>${price}</strong></span></div>`;
+    });
+
+    // 3. Process Markdown Links: [label](url) -> Standout Action Buttons
+    out = out.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, (_match, rawLabel, rawUrl) => {
+      const url = rawUrl.trim();
+      const label = rawLabel.trim();
+      const lowerUrl = url.toLowerCase();
+      const lowerLabel = label.toLowerCase();
+
+      // Standout Checkout Action Button
+      if (lowerUrl.includes('checkout') || lowerLabel.includes('checkout')) {
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-action-btn chat-checkout-btn">
+          <span class="btn-icon">💳</span>
+          <span class="btn-text">${label}</span>
+          <span class="btn-arrow">➔</span>
+        </a>`;
+      }
+
+      // Standout Cart Action Button
+      if (lowerUrl.includes('cart') || lowerLabel.includes('cart') || lowerLabel.includes('basket')) {
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-action-btn chat-cart-btn">
+          <span class="btn-icon">🛒</span>
+          <span class="btn-text">${label}</span>
+          <span class="btn-arrow">➔</span>
+        </a>`;
+      }
+
+      // Standout Order Tracking Action Button
+      if (lowerUrl.includes('order') || lowerUrl.includes('track') || lowerLabel.includes('order') || lowerLabel.includes('track')) {
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-action-btn chat-track-btn">
+          <span class="btn-icon">📦</span>
+          <span class="btn-text">${label}</span>
+          <span class="btn-arrow">➔</span>
+        </a>`;
+      }
+
+      // Standard Inline Link
+      return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-inline-link">${label} <span class="ext-icon">↗</span></a>`;
+    });
+
+    // 4. Auto-link standalone naked URLs (not inside an href)
+    out = out.replace(/(?<!href=["'])(https?:\/\/[a-zA-Z0-9_\-\.\/]+(?:\?[a-zA-Z0-9_\-=&%]+)?)/g, (url) => {
+      return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="chat-inline-link">${url} <span class="ext-icon">↗</span></a>`;
+    });
+
+    // 5. Clean Bullet Lists
     out = out.replace(/^[•\-\*]\s+(.*)$/gm, '<li>$1</li>');
-    out = out.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
-    // Paragraphs
-    out = out.split('\n\n').map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+    out = out.replace(/((?:<li>.*<\/li>\s*)+)/g, '<ul>$1</ul>');
+
+    // 6. Paragraphs and Linebreaks
+    const paragraphs = out.split(/\n\s*\n/);
+    out = paragraphs.map(p => {
+      const trimmed = p.trim();
+      if (!trimmed) return '';
+      if (trimmed.startsWith('<div') || trimmed.startsWith('<ul') || trimmed.startsWith('<a')) {
+        return trimmed;
+      }
+      return `<p>${trimmed.replace(/\n/g, '<br>')}</p>`;
+    }).filter(Boolean).join('');
+
     return out;
   }
 }

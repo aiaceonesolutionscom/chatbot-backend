@@ -1,16 +1,24 @@
-var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configurable:!0,writable:!0,value:f}):x[m]=f;var u=(x,m,f)=>A(x,typeof m!="symbol"?m+"":m,f);(function(x){"use strict";function m(k="#16408a",t="bottom-right"){const e=t==="bottom-right";return`
+var I=Object.defineProperty;var T=(x,m,g)=>m in x?I(x,m,{enumerable:!0,configurable:!0,writable:!0,value:g}):x[m]=g;var u=(x,m,g)=>T(x,typeof m!="symbol"?m+"":m,g);(function(x){"use strict";function m(k="#0d2958",t="bottom-right"){const e=t==="bottom-right";return`
     :host {
       --primary: ${k};
-      --primary-hover: #12336e;
-      --primary-light: #eff6ff;
-      --accent: #248acc;
+      --primary-dark: #07152b;
+      --primary-light: #16408a;
+      --accent-cyan: #0284c7;
+      --accent-cyan-light: #38bdf8;
+      --accent-cyan-subtle: #f0f9ff;
+      --emerald: #10b981;
+      --emerald-dark: #059669;
+      --emerald-subtle: #ecfdf5;
       --bg: #ffffff;
-      --card-bg: #f8fafc;
+      --surface-canvas: #f8fafc;
+      --surface-card: #ffffff;
       --text-main: #0f172a;
       --text-sub: #475569;
       --text-muted: #94a3b8;
       --border-color: #e2e8f0;
-      --shadow-lg: 0 24px 45px -8px rgba(22, 64, 138, 0.22), 0 12px 20px -4px rgba(0, 0, 0, 0.08);
+      --border-focus: #38bdf8;
+      --shadow-floating: 0 20px 45px -8px rgba(13, 41, 88, 0.28), 0 8px 16px -4px rgba(0, 0, 0, 0.08);
+      --shadow-card: 0 4px 18px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
       --font-family: 'Jost', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-family: var(--font-family);
       font-size: 14px;
@@ -29,25 +37,31 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       padding: 0;
     }
 
-    @keyframes launcherPulse {
+    /* Core Fluid Keyframes */
+    @keyframes launcherBreath {
       0%, 100% {
-        box-shadow: 0 8px 24px rgba(22, 64, 138, 0.16), 0 0 0 0 rgba(36, 138, 204, 0.4);
+        box-shadow: 0 10px 30px rgba(13, 41, 88, 0.18), 0 0 0 0 rgba(2, 132, 199, 0.45);
+        transform: translateY(0);
       }
       50% {
-        box-shadow: 0 12px 30px rgba(22, 64, 138, 0.26), 0 0 0 7px rgba(36, 138, 204, 0);
+        box-shadow: 0 14px 38px rgba(13, 41, 88, 0.28), 0 0 0 7px rgba(2, 132, 199, 0);
+        transform: translateY(-2px);
       }
     }
 
     @keyframes pulseBeacon {
-      0% { transform: scale(0.92); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
-      70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
-      100% { transform: scale(0.92); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+      0% { transform: scale(0.94); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { transform: scale(1.04); box-shadow: 0 0 0 7px rgba(16, 185, 129, 0); }
+      100% { transform: scale(0.94); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
     }
 
     @keyframes windowPopIn {
       0% {
         opacity: 0;
-        transform: scale(0.9) translateY(20px);
+        transform: scale(0.92) translateY(24px);
+      }
+      70% {
+        transform: scale(1.01) translateY(-2px);
       }
       100% {
         opacity: 1;
@@ -55,70 +69,99 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       }
     }
 
-    @keyframes msgSlideUp {
+    @keyframes bubbleSlideIn {
       0% {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(14px) scale(0.98);
       }
       100% {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
       }
     }
 
-    /* Floating Pill Launcher with Mascot */
+    @keyframes chipEntrance {
+      from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.94);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes avatarHalo {
+      0%, 100% {
+        filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.45));
+      }
+      50% {
+        filter: drop-shadow(0 0 12px rgba(56, 189, 248, 0.85));
+      }
+    }
+
+    /* Floating Pill Launcher (Mascot + Text) */
     .launcher-pill {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 13px;
       background: rgba(255, 255, 255, 0.98);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       color: var(--text-main);
-      border-radius: 40px;
-      padding: 7px 18px 7px 10px;
-      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.14), 0 2px 6px rgba(0, 0, 0, 0.04);
-      border: 1px solid rgba(226, 232, 240, 0.9);
+      border-radius: 44px;
+      padding: 8px 20px 8px 10px;
+      box-shadow: 0 12px 34px rgba(15, 23, 42, 0.16), 0 2px 8px rgba(0, 0, 0, 0.04);
+      border: 1.5px solid rgba(226, 232, 240, 0.95);
       cursor: pointer;
-      transition: all 0.24s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transition: all 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
       user-select: none;
-      animation: launcherPulse 4s infinite ease-in-out;
+      animation: launcherBreath 4s infinite ease-in-out;
     }
 
     .launcher-pill:hover {
-      transform: translateY(-3px) scale(1.02);
-      box-shadow: 0 16px 36px rgba(22, 64, 138, 0.22);
-      border-color: var(--accent);
+      transform: translateY(-4px) scale(1.03);
+      box-shadow: 0 18px 42px rgba(13, 41, 88, 0.25);
+      border-color: var(--accent-cyan);
+    }
+
+    .launcher-pill:active {
+      transform: scale(0.97);
     }
 
     .launcher-text-wrap {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 1px;
+      gap: 2px;
     }
 
     .launcher-headline {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 7px;
     }
 
     .launcher-title {
       font-weight: 800;
-      font-size: 14.5px;
-      letter-spacing: -0.2px;
-      color: var(--primary);
+      font-size: 15px;
+      letter-spacing: -0.3px;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--accent-cyan) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
 
     .launcher-pill-status {
       font-size: 10px;
       font-weight: 700;
-      color: #16a34a;
-      background: #f0fdf4;
-      padding: 1px 6px;
-      border-radius: 10px;
+      color: var(--emerald-dark);
+      background: var(--emerald-subtle);
+      padding: 1.5px 7px;
+      border-radius: 12px;
       border: 1px solid #bbf7d0;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
     }
 
     .launcher-sub {
@@ -126,14 +169,6 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       font-weight: 500;
       color: var(--text-sub);
       white-space: nowrap;
-    }
-
-    .launcher-text {
-      font-weight: 700;
-      font-size: 15px;
-      letter-spacing: -0.2px;
-      white-space: nowrap;
-      color: var(--primary);
     }
 
     .launcher-avatar-wrap {
@@ -149,32 +184,38 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       width: 44px;
       height: 44px;
       border-radius: 50%;
-      background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-light) 60%, var(--accent-cyan) 100%);
       color: #ffffff;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 4px 10px rgba(22, 64, 138, 0.25);
+      box-shadow: 0 4px 12px rgba(13, 41, 88, 0.25);
       overflow: hidden;
       border: 2px solid #ffffff;
+      transition: transform 0.25s ease;
+    }
+
+    .launcher-pill:hover .launcher-avatar {
+      transform: rotate(6deg) scale(1.05);
     }
 
     .launcher-avatar img {
       width: 100%;
       height: 100%;
       object-fit: cover;
+      display: block;
     }
 
     .online-badge {
       position: absolute;
-      bottom: 0px;
-      right: 0px;
+      bottom: -1px;
+      right: -1px;
       width: 13px;
       height: 13px;
-      background: #22c55e;
+      background: var(--emerald);
       border: 2.5px solid #ffffff;
       border-radius: 50%;
-      animation: pulseBeacon 2s infinite ease-in-out;
+      animation: pulseBeacon 2.2s infinite ease-in-out;
     }
 
     /* Chat Window Container */
@@ -182,43 +223,44 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       position: fixed;
       ${e?"right: 24px;":"left: 24px;"};
       bottom: 96px;
-      width: 410px;
+      width: 420px;
       max-width: calc(100vw - 32px);
-      height: 640px;
+      height: 660px;
       max-height: calc(100vh - 120px);
       background: var(--bg);
-      border-radius: 22px;
-      box-shadow: var(--shadow-lg);
+      border-radius: 24px;
+      box-shadow: var(--shadow-floating);
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      border: 1px solid rgba(22, 64, 138, 0.15);
-      transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.22s;
+      border: 1px solid rgba(13, 41, 88, 0.16);
+      transition: opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1), transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1), visibility 0.24s;
       transform-origin: ${e?"bottom right":"bottom left"};
       z-index: 999999;
     }
 
     .chat-window:not(.hidden) {
-      animation: windowPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation: windowPopIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
     }
 
     .chat-window.hidden {
       opacity: 0;
       visibility: hidden;
-      transform: scale(0.92) translateY(14px);
+      transform: scale(0.90) translateY(20px);
       pointer-events: none;
     }
 
-    /* Branded Banner Header (Colbolt Uomo Theme Style Gradient) */
+    /* Branded Banner Header (Colbolt Bio-Research Gradient) */
     .chat-header-banner {
       flex-shrink: 0;
-      background: linear-gradient(135deg, #0d2958 0%, #16408a 60%, #1f64c6 100%);
+      background: linear-gradient(135deg, #07152b 0%, #0d2958 45%, #16408a 80%, #0284c7 100%);
       padding: 16px 18px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
       position: relative;
+      box-shadow: 0 4px 16px rgba(7, 21, 43, 0.35);
     }
 
     .banner-brand-info {
@@ -232,19 +274,21 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       height: 52px;
       border-radius: 50%;
       background: #ffffff;
-      border: 2px solid rgba(255, 255, 255, 0.8);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      border: 2px solid rgba(255, 255, 255, 0.9);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
       flex-shrink: 0;
+      animation: avatarHalo 4s infinite ease-in-out;
     }
 
     .banner-mascot img {
       width: 100%;
       height: 100%;
       object-fit: cover;
+      display: block;
     }
 
     .banner-text-group {
@@ -253,26 +297,39 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
     }
 
     .banner-greeting {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 500;
       color: rgba(255, 255, 255, 0.85);
       line-height: 1.1;
+      letter-spacing: 0.2px;
     }
 
     .banner-assistant-name {
-      font-size: 24px;
+      font-size: 23px;
       font-weight: 900;
       color: #ffffff;
-      line-height: 1.1;
-      letter-spacing: -0.5px;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      line-height: 1.15;
+      letter-spacing: -0.4px;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
     }
 
     .banner-tagline {
-      font-size: 11.5px;
-      font-weight: 500;
+      font-size: 11px;
+      font-weight: 600;
       color: #93c5fd;
-      margin-top: 3px;
+      margin-top: 2px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .banner-tagline-dot {
+      width: 6px;
+      height: 6px;
+      background: #4ade80;
+      border-radius: 50%;
+      display: inline-block;
+      box-shadow: 0 0 6px #4ade80;
     }
 
     .banner-controls {
@@ -282,8 +339,8 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
     }
 
     .banner-btn {
-      width: 32px;
-      height: 32px;
+      width: 34px;
+      height: 34px;
       border-radius: 50%;
       background: rgba(255, 255, 255, 0.18);
       border: 1px solid rgba(255, 255, 255, 0.35);
@@ -292,13 +349,13 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      transition: background 0.15s ease, transform 0.15s ease;
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
       text-decoration: none;
     }
 
     .banner-btn:hover {
       background: rgba(255, 255, 255, 0.35);
-      transform: scale(1.08);
+      transform: scale(1.1);
       color: #ffffff;
     }
 
@@ -306,25 +363,26 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       color: #ffffff;
       background: #22c55e;
       border-color: #22c55e;
-      box-shadow: 0 2px 8px rgba(34, 197, 94, 0.35);
+      box-shadow: 0 2px 10px rgba(34, 197, 94, 0.4);
     }
 
-    /* Store Introduction Subheader */
+    /* Store Sub-Intro Banner */
     .store-sub-intro {
       flex-shrink: 0;
-      padding: 14px 20px 8px;
+      padding: 12px 18px 8px;
       background: #ffffff;
+      border-bottom: 1px solid #f1f5f9;
     }
 
     .store-title {
-      font-size: 17px;
+      font-size: 16px;
       font-weight: 800;
       color: var(--text-main);
       letter-spacing: -0.3px;
     }
 
     .store-subtitle {
-      font-size: 13px;
+      font-size: 12px;
       color: var(--text-sub);
       margin-top: 2px;
     }
@@ -334,12 +392,12 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       flex: 1 1 0%;
       min-height: 0;
       max-height: 100%;
-      padding: 16px 18px;
+      padding: 16px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
       gap: 14px;
-      background: #ffffff;
+      background: var(--surface-canvas);
       scroll-behavior: smooth;
       -webkit-overflow-scrolling: touch;
     }
@@ -348,7 +406,7 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       display: flex;
       gap: 10px;
       align-items: flex-end;
-      animation: msgSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation: bubbleSlideIn 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
     .message-row.user {
@@ -360,54 +418,57 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
     }
 
     .message-avatar {
-      width: 34px;
-      height: 34px;
+      width: 36px;
+      height: 36px;
       border-radius: 50%;
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
+      background: #ffffff;
+      border: 1.5px solid var(--border-color);
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
       flex-shrink: 0;
       margin-bottom: 16px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
     }
 
     .message-avatar img {
       width: 100%;
       height: 100%;
       object-fit: cover;
+      display: block;
     }
 
     .message-content-group {
       display: flex;
       flex-direction: column;
-      max-width: 82%;
+      max-width: 86%;
     }
 
     .message-bubble {
-      padding: 12px 16px;
+      padding: 13px 17px;
       font-size: 13.5px;
-      line-height: 1.5;
+      line-height: 1.55;
       word-break: break-word;
     }
 
     .message-bubble.user {
-      background: var(--primary);
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
       color: #ffffff;
       border-radius: 20px 20px 4px 20px;
-      box-shadow: 0 2px 8px rgba(30, 115, 190, 0.25);
+      box-shadow: 0 4px 14px rgba(13, 41, 88, 0.24);
     }
 
     .message-bubble.assistant {
-      background: #f8fafc;
+      background: #ffffff;
       color: var(--text-main);
       border: 1px solid var(--border-color);
       border-radius: 20px 20px 20px 4px;
+      box-shadow: var(--shadow-card);
     }
 
     .message-bubble p {
-      margin-bottom: 6px;
+      margin-bottom: 7px;
     }
     .message-bubble p:last-child {
       margin-bottom: 0;
@@ -418,8 +479,11 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
     }
     .message-bubble ul {
       margin-left: 18px;
-      margin-top: 4px;
-      margin-bottom: 4px;
+      margin-top: 5px;
+      margin-bottom: 5px;
+    }
+    .message-bubble li {
+      margin-bottom: 3px;
     }
 
     .message-timestamp {
@@ -437,24 +501,173 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       margin-left: 6px;
     }
 
+    /* STANDOUT CLICKABLE ACTION BUTTONS & CHIPS IN CHAT (PRO-MAX) */
+    .chat-action-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+      width: 100%;
+    }
+
+    .chat-action-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 18px;
+      border-radius: 30px;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: -0.1px;
+      cursor: pointer;
+      transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      border: none;
+      outline: none;
+    }
+
+    .chat-action-btn:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 2px;
+    }
+
+    /* Checkout Standout Button (Emerald Radiant Glow) */
+    .chat-action-btn.chat-checkout-btn {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      box-shadow: 0 6px 18px rgba(16, 185, 129, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+    }
+
+    .chat-action-btn.chat-checkout-btn:hover {
+      background: linear-gradient(135deg, #059669 0%, #047857 100%);
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 10px 24px rgba(16, 185, 129, 0.45);
+      color: #ffffff;
+    }
+
+    /* Cart Standout Button (Cobalt Gradient) */
+    .chat-action-btn.chat-cart-btn {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 60%, var(--accent-cyan) 100%);
+      color: #ffffff;
+      box-shadow: 0 6px 18px rgba(13, 41, 88, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .chat-action-btn.chat-cart-btn:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 10px 24px rgba(2, 132, 199, 0.4);
+      color: #ffffff;
+    }
+
+    /* Tracking Standout Button (Dark Sleek) */
+    .chat-action-btn.chat-track-btn {
+      background: #0f172a;
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.25);
+    }
+
+    .chat-action-btn.chat-track-btn:hover {
+      background: #1e293b;
+      color: #ffffff;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(56, 189, 248, 0.3);
+    }
+
+    .btn-icon {
+      font-size: 15px;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .btn-text {
+      flex: 1;
+      text-align: left;
+    }
+
+    .btn-arrow {
+      font-size: 13px;
+      transition: transform 0.2s ease;
+    }
+
+    .chat-action-btn:hover .btn-arrow {
+      transform: translateX(3px);
+    }
+
+    /* Inline Markdown Link Styling */
+    .chat-inline-link {
+      color: var(--accent-cyan);
+      font-weight: 600;
+      text-decoration: none;
+      border-bottom: 1.5px solid rgba(2, 132, 199, 0.35);
+      padding-bottom: 1px;
+      transition: all 0.18s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .chat-inline-link:hover {
+      color: var(--primary);
+      border-color: var(--primary);
+    }
+
+    .ext-icon {
+      font-size: 11px;
+      opacity: 0.75;
+    }
+
+    /* Subtotal Highlight Callout Card */
+    .subtotal-highlight-badge {
+      background: linear-gradient(135deg, #f0f9ff 0%, #ecfdf5 100%);
+      border: 1.5px solid #bae6fd;
+      border-radius: 14px;
+      padding: 10px 14px;
+      margin: 8px 0;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--text-main);
+      font-size: 13.5px;
+      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.08);
+    }
+
+    .subtotal-icon {
+      font-size: 18px;
+    }
+
+    .subtotal-text {
+      flex: 1;
+    }
+
+    .subtotal-text strong {
+      color: var(--emerald-dark);
+      font-size: 15px;
+      font-weight: 800;
+    }
+
     /* Typing Indicator */
     .typing-indicator {
       display: flex;
       align-items: center;
-      gap: 4px;
-      padding: 10px 14px;
-      background: #f8fafc;
+      gap: 5px;
+      padding: 12px 16px;
+      background: #ffffff;
       border: 1px solid var(--border-color);
-      border-radius: 16px;
+      border-radius: 18px;
       border-bottom-left-radius: 4px;
       width: fit-content;
-      margin-left: 44px;
+      margin-left: 46px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
     }
 
     .typing-dot {
-      width: 6px;
-      height: 6px;
-      background: var(--text-muted);
+      width: 7px;
+      height: 7px;
+      background: var(--accent-cyan);
       border-radius: 50%;
       animation: typingBounce 1.4s infinite ease-in-out both;
     }
@@ -462,38 +675,47 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
     .typing-dot:nth-child(2) { animation-delay: -0.16s; }
 
     @keyframes typingBounce {
-      0%, 80%, 100% { transform: scale(0); }
-      40% { transform: scale(1); }
+      0%, 80%, 100% { transform: scale(0.4); opacity: 0.4; }
+      40% { transform: scale(1.1); opacity: 1; }
     }
 
-    /* Quick Reply Chips */
+    /* Quick Reply Suggestion Chips */
     .quick-replies {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
-      margin-top: 8px;
-      margin-left: 44px;
+      gap: 7px;
+      margin-top: 10px;
+      margin-left: 46px;
     }
 
     .quick-reply-btn {
       background: #ffffff;
-      border: 1px solid var(--primary);
+      border: 1.5px solid rgba(13, 41, 88, 0.2);
       color: var(--primary);
-      border-radius: 20px;
-      padding: 6px 14px;
+      border-radius: 24px;
+      padding: 7px 15px;
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
-      transition: all 0.15s ease;
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
       white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+      animation: chipEntrance 0.25s ease-out;
     }
 
     .quick-reply-btn:hover {
-      background: var(--primary);
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
       color: #ffffff;
+      border-color: transparent;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 14px rgba(13, 41, 88, 0.2);
     }
 
-    /* Product Cards Container */
+    .quick-reply-btn:active {
+      transform: scale(0.96);
+    }
+
+    /* Interactive Product Cards */
     .product-cards-container {
       display: flex;
       flex-direction: column;
@@ -505,28 +727,31 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
     .product-card {
       background: #ffffff;
       border: 1px solid var(--border-color);
-      border-radius: 14px;
+      border-radius: 16px;
       overflow: hidden;
-      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+      transition: transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.24s ease;
       display: flex;
       flex-direction: column;
+      position: relative;
     }
 
     .product-card:hover {
-      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.09);
+      transform: translateY(-3px);
+      box-shadow: 0 10px 24px rgba(13, 41, 88, 0.12);
+      border-color: #cbd5e1;
     }
 
     .product-img-wrap {
       width: 100%;
-      height: 190px;
+      height: 195px;
       background: #ffffff;
       position: relative;
       overflow: hidden;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 12px;
+      padding: 14px;
       border-bottom: 1px solid #f1f5f9;
     }
 
@@ -537,11 +762,130 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       height: auto;
       object-fit: contain;
       object-position: center;
-      transition: transform 0.28s ease;
+      transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .product-card:hover .product-img {
-      transform: scale(1.04);
+      transform: scale(1.06);
+    }
+
+    .product-stock-tag {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: var(--emerald);
+      color: #ffffff;
+      font-size: 10.5px;
+      font-weight: 800;
+      padding: 3px 9px;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(16, 185, 129, 0.35);
+      letter-spacing: 0.2px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .product-details {
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      background: #ffffff;
+    }
+
+    .product-title {
+      font-weight: 800;
+      font-size: 15px;
+      color: var(--text-main);
+      line-height: 1.3;
+      letter-spacing: -0.2px;
+    }
+
+    .product-price-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .product-price {
+      font-size: 17px;
+      font-weight: 900;
+      color: var(--primary);
+    }
+
+    .product-actions {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-top: 6px;
+    }
+
+    .qty-picker {
+      display: flex;
+      align-items: center;
+      border: 1.5px solid var(--border-color);
+      border-radius: 10px;
+      background: #f8fafc;
+      overflow: hidden;
+    }
+
+    .qty-btn {
+      width: 28px;
+      height: 32px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-weight: 800;
+      font-size: 14px;
+      color: var(--text-main);
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .qty-btn:hover {
+      background: #e2e8f0;
+      color: var(--primary);
+    }
+
+    .qty-display {
+      font-size: 13px;
+      font-weight: 800;
+      padding: 0 6px;
+      min-width: 20px;
+      text-align: center;
+      color: var(--text-main);
+    }
+
+    .add-to-cart-btn {
+      flex: 1;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 60%, var(--accent-cyan) 100%);
+      color: #ffffff;
+      border: none;
+      border-radius: 10px;
+      padding: 9px 14px;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      box-shadow: 0 4px 12px rgba(13, 41, 88, 0.2);
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .add-to-cart-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(2, 132, 199, 0.35);
+    }
+
+    .add-to-cart-btn:active {
+      transform: scale(0.97);
+    }
+
+    .add-to-cart-btn.added {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
     }
 
     /* Sticky In-Chat Cart Bar */
@@ -550,13 +894,13 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 8px 14px;
-      background: #0f172a;
+      padding: 9px 16px;
+      background: #07152b;
       color: #ffffff;
       font-size: 12px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-      animation: msgSlideUp 0.25s ease-out;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+      animation: bubbleSlideIn 0.25s ease-out;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
       z-index: 10;
     }
 
@@ -572,7 +916,7 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
     }
 
     .cart-strip-icon {
-      font-size: 15px;
+      font-size: 16px;
     }
 
     .cart-strip-count {
@@ -581,45 +925,47 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
 
     .cart-strip-total {
       color: #38bdf8;
-      font-weight: 700;
+      font-weight: 800;
     }
 
     .cart-strip-actions {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 7px;
     }
 
     .cart-strip-manage-btn {
-      background: rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.16);
       color: #ffffff;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-size: 11.5px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.15s ease;
-    }
-
-    .cart-strip-manage-btn:hover {
-      background: rgba(255, 255, 255, 0.25);
-    }
-
-    .cart-strip-checkout-btn {
-      background: #16a34a;
-      color: #ffffff;
-      text-decoration: none;
-      padding: 4px 11px;
-      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.24);
+      padding: 5px 11px;
+      border-radius: 8px;
       font-size: 11.5px;
       font-weight: 700;
       cursor: pointer;
-      transition: background 0.15s ease;
+      transition: background 0.18s ease;
+    }
+
+    .cart-strip-manage-btn:hover {
+      background: rgba(255, 255, 255, 0.28);
+    }
+
+    .cart-strip-checkout-btn {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      text-decoration: none;
+      padding: 5px 13px;
+      border-radius: 8px;
+      font-size: 11.5px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+      transition: all 0.18s ease;
     }
 
     .cart-strip-checkout-btn:hover {
-      background: #15803d;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.45);
     }
 
     /* Slide-over Cart Drawer */
@@ -630,14 +976,14 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       width: 100%;
       height: 100%;
       background: rgba(255, 255, 255, 0.98);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
       z-index: 50;
       display: flex;
       flex-direction: column;
-      border-radius: 22px;
-      box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.15);
-      animation: msgSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      border-radius: 24px;
+      box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.16);
+      animation: bubbleSlideIn 0.24s cubic-bezier(0.16, 1, 0.3, 1);
       overflow: hidden;
     }
 
@@ -646,7 +992,7 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
     }
 
     .cart-drawer-header {
-      padding: 14px 18px;
+      padding: 16px 20px;
       background: #f8fafc;
       border-bottom: 1px solid #e2e8f0;
       display: flex;
@@ -657,29 +1003,30 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
     .drawer-title-wrap {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 9px;
     }
 
     .drawer-title {
       font-weight: 800;
-      font-size: 15px;
+      font-size: 16px;
       color: var(--text-main);
+      letter-spacing: -0.2px;
     }
 
     .drawer-badge {
       background: var(--primary);
       color: #ffffff;
       font-size: 11px;
-      font-weight: 700;
-      padding: 2px 7px;
+      font-weight: 800;
+      padding: 2px 8px;
       border-radius: 12px;
     }
 
     .cart-drawer-close-btn {
       background: #e2e8f0;
       border: none;
-      width: 28px;
-      height: 28px;
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
       cursor: pointer;
       display: flex;
@@ -687,12 +1034,13 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       justify-content: center;
       font-size: 14px;
       color: var(--text-sub);
-      transition: all 0.15s ease;
+      transition: all 0.18s ease;
     }
 
     .cart-drawer-close-btn:hover {
       background: #cbd5e1;
       color: var(--text-main);
+      transform: scale(1.08);
     }
 
     .cart-drawer-items {
@@ -701,13 +1049,14 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       padding: 14px 16px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 11px;
     }
 
     .cart-drawer-empty {
       text-align: center;
-      padding: 40px 20px;
+      padding: 44px 20px;
       color: var(--text-muted);
+      font-size: 14px;
     }
 
     .cart-drawer-item {
@@ -716,18 +1065,18 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       gap: 12px;
       background: #ffffff;
       border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 10px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+      border-radius: 14px;
+      padding: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
     }
 
     .drawer-item-img {
-      width: 50px;
-      height: 50px;
-      border-radius: 8px;
+      width: 52px;
+      height: 52px;
+      border-radius: 10px;
       object-fit: contain;
       background: #f8fafc;
-      padding: 4px;
+      padding: 5px;
       border: 1px solid #f1f5f9;
       flex-shrink: 0;
     }
@@ -747,9 +1096,9 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
     }
 
     .drawer-item-price {
-      font-size: 12.5px;
+      font-size: 13px;
       color: var(--primary);
-      font-weight: 700;
+      font-weight: 800;
       margin-top: 2px;
     }
 
@@ -776,30 +1125,30 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
     .drawer-item-remove-btn:hover {
       background: #fee2e2;
       border-color: #fca5a5;
-      transform: scale(1.05);
+      transform: scale(1.08);
     }
 
     .cart-drawer-footer {
-      padding: 14px 18px;
+      padding: 16px 20px;
       background: #f8fafc;
       border-top: 1px solid #e2e8f0;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 12px;
     }
 
     .drawer-subtotal-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      font-size: 14px;
-      font-weight: 600;
+      font-size: 14.5px;
+      font-weight: 700;
       color: var(--text-main);
     }
 
     .drawer-total-price {
-      font-size: 17px;
-      font-weight: 800;
+      font-size: 19px;
+      font-weight: 900;
       color: var(--primary);
     }
 
@@ -814,12 +1163,12 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       background: #ffffff;
       border: 1px solid #cbd5e1;
       color: var(--text-sub);
-      padding: 10px 14px;
-      border-radius: 10px;
-      font-weight: 600;
+      padding: 11px 14px;
+      border-radius: 12px;
+      font-weight: 700;
       font-size: 13px;
       cursor: pointer;
-      transition: all 0.15s ease;
+      transition: all 0.18s ease;
     }
 
     .drawer-clear-btn:hover {
@@ -830,127 +1179,31 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
 
     .drawer-checkout-btn {
       flex: 2;
-      background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
       color: #ffffff;
       border: none;
-      padding: 10px 16px;
-      border-radius: 10px;
-      font-weight: 700;
-      font-size: 13.5px;
+      padding: 11px 18px;
+      border-radius: 12px;
+      font-weight: 800;
+      font-size: 14px;
       text-align: center;
       text-decoration: none;
       cursor: pointer;
-      box-shadow: 0 4px 12px rgba(22, 163, 74, 0.28);
-      transition: all 0.18s ease;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
+      gap: 7px;
     }
 
     .drawer-checkout-btn:hover {
-      box-shadow: 0 6px 16px rgba(22, 163, 74, 0.38);
-      transform: translateY(-1px);
-    }
-
-    .product-stock-tag {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      background: #22c55e;
+      box-shadow: 0 8px 20px rgba(16, 185, 129, 0.45);
+      transform: translateY(-2px);
       color: #ffffff;
-      font-size: 10px;
-      font-weight: 700;
-      padding: 2px 7px;
-      border-radius: 10px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
     }
 
-    .product-details {
-      padding: 12px 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .product-title {
-      font-weight: 700;
-      font-size: 14.5px;
-      color: var(--text-main);
-      line-height: 1.3;
-    }
-
-    .product-price-row {
-      display: flex;
-      align-items: baseline;
-      gap: 8px;
-    }
-
-    .product-price {
-      font-size: 16px;
-      font-weight: 800;
-      color: var(--primary);
-    }
-
-    .product-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 6px;
-    }
-
-    .qty-picker {
-      display: flex;
-      align-items: center;
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      background: #f8fafc;
-    }
-
-    .qty-btn {
-      width: 26px;
-      height: 30px;
-      border: none;
-      background: transparent;
-      cursor: pointer;
-      font-weight: bold;
-      color: var(--text-main);
-    }
-
-    .qty-display {
-      font-size: 12.5px;
-      font-weight: 700;
-      padding: 0 4px;
-      min-width: 18px;
-      text-align: center;
-    }
-
-    .add-to-cart-btn {
-      flex: 1;
-      background: var(--primary);
-      color: #ffffff;
-      border: none;
-      border-radius: 8px;
-      padding: 8px 14px;
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      transition: background 0.15s ease, transform 0.1s ease;
-    }
-
-    .add-to-cart-btn:hover {
-      background: var(--primary-hover);
-    }
-
-    .add-to-cart-btn.added {
-      background: #16a34a;
-    }
-
-    /* Modern Bottom Input Bar (YANA Style with + button) */
+    /* Modern Bottom Input Bar */
     .chat-footer {
       flex-shrink: 0;
       padding: 12px 16px;
@@ -963,20 +1216,20 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       align-items: center;
       background: #ffffff;
       border: 1.5px solid var(--border-color);
-      border-radius: 30px;
+      border-radius: 32px;
       padding: 4px 6px 4px 12px;
       gap: 8px;
-      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
 
     .input-pill-container:focus-within {
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(30, 115, 190, 0.12);
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
     }
 
     .action-plus-btn {
-      width: 28px;
-      height: 28px;
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
       border: none;
       background: #f1f5f9;
@@ -986,12 +1239,13 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       justify-content: center;
       cursor: pointer;
       flex-shrink: 0;
-      transition: background 0.15s ease;
+      transition: all 0.18s ease;
     }
 
     .action-plus-btn:hover {
       background: #e2e8f0;
-      color: var(--text-main);
+      color: var(--primary);
+      transform: rotate(90deg);
     }
 
     .chat-input {
@@ -1002,7 +1256,7 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       font-family: inherit;
       color: var(--text-main);
       background: transparent;
-      padding: 6px 0;
+      padding: 7px 0;
     }
 
     .chat-input::placeholder {
@@ -1010,10 +1264,10 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
     }
 
     .send-icon-btn {
-      width: 32px;
-      height: 32px;
+      width: 34px;
+      height: 34px;
       border-radius: 50%;
-      background: var(--primary);
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 60%, var(--accent-cyan) 100%);
       border: none;
       color: #ffffff;
       cursor: pointer;
@@ -1021,12 +1275,17 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      transition: transform 0.15s ease, background 0.15s ease;
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+      box-shadow: 0 2px 8px rgba(13, 41, 88, 0.25);
     }
 
     .send-icon-btn:hover {
-      background: var(--primary-hover);
-      transform: scale(1.06);
+      transform: scale(1.08);
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
+    }
+
+    .send-icon-btn:active {
+      transform: scale(0.95);
     }
 
     .send-icon-btn svg {
@@ -1038,47 +1297,48 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
     /* Quick Actions Menu (opened via + button) */
     .action-menu {
       position: absolute;
-      bottom: 74px;
+      bottom: 76px;
       left: 16px;
       right: 16px;
       background: #ffffff;
       border: 1px solid var(--border-color);
-      border-radius: 16px;
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+      border-radius: 18px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.18);
       padding: 8px;
       display: flex;
       flex-direction: column;
       gap: 4px;
       z-index: 20;
-      transition: opacity 0.15s ease, transform 0.15s ease;
+      transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .action-menu.hidden {
       opacity: 0;
       visibility: hidden;
-      transform: translateY(10px);
+      transform: translateY(12px) scale(0.96);
       pointer-events: none;
     }
 
     .action-menu-item {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 10px 14px;
-      border-radius: 10px;
+      gap: 11px;
+      padding: 11px 15px;
+      border-radius: 12px;
       border: none;
       background: transparent;
       color: var(--text-main);
       font-size: 13.5px;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
       text-align: left;
-      transition: background 0.12s ease;
+      transition: all 0.15s ease;
     }
 
     .action-menu-item:hover {
       background: #f1f5f9;
-      color: var(--primary);
+      color: var(--accent-cyan);
+      transform: translateX(3px);
     }
 
     .action-menu-item svg {
@@ -1086,87 +1346,6 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       height: 18px;
       fill: currentColor;
       flex-shrink: 0;
-    }
-
-    /* Interactive Tile Calculator Card */
-    .tile-calc-card {
-      background: #ffffff;
-      border: 1.5px solid #cbd5e1;
-      border-radius: 14px;
-      padding: 14px;
-      margin-top: 10px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    }
-
-    .tile-calc-title {
-      font-size: 14px;
-      font-weight: 800;
-      color: var(--text-main);
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .tile-calc-inputs {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-
-    .tile-calc-field {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
-
-    .tile-calc-field label {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-sub);
-    }
-
-    .tile-calc-field input {
-      padding: 7px 10px;
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      font-size: 13px;
-      outline: none;
-      background: #f8fafc;
-    }
-
-    .tile-calc-field input:focus {
-      border-color: var(--primary);
-      background: #ffffff;
-    }
-
-    .tile-calc-btn {
-      width: 100%;
-      padding: 9px;
-      background: var(--primary);
-      color: #ffffff;
-      border: none;
-      border-radius: 8px;
-      font-weight: 700;
-      font-size: 13px;
-      cursor: pointer;
-      transition: background 0.15s ease;
-    }
-
-    .tile-calc-btn:hover {
-      background: var(--primary-hover);
-    }
-
-    .tile-calc-result {
-      margin-top: 10px;
-      padding: 10px;
-      background: #f0fdf4;
-      border: 1px solid #bbf7d0;
-      border-radius: 8px;
-      font-size: 12.5px;
-      color: #166534;
-      display: none;
     }
 
     /* Mobile Responsive */
@@ -1181,12 +1360,35 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
         left: 0;
         border-radius: 0;
       }
+      .launcher-pill {
+        bottom: 16px;
+        right: 16px;
+      }
     }
-  `}class f{static isWpStorefront(){return typeof window<"u"&&(window.location.hostname.includes("colbolt.hawksnfox.com")||!!window.wc_store_api_nonce||!!window.wc_add_to_cart_params||!!window.woocommerce_params)}static getHeaders(){var e,i;const t={"Content-Type":"application/json",Accept:"application/json"};if(typeof window<"u"){const s=window.wc_store_api_nonce||((e=window.UniversalChatbotConfig)==null?void 0:e.nonce)||((i=document.querySelector('meta[name="wc-store-api-nonce"]'))==null?void 0:i.content);s&&(t.Nonce=s)}return t}static async fetchLiveCart(){if(!this.isWpStorefront())return null;try{const t=await fetch(`${window.location.origin}/wp-json/wc/store/v1/cart`,{method:"GET",headers:this.getHeaders(),credentials:"include"});if(t.ok)return((await t.json()).items||[]).map(i=>{var s,r,o;return{key:i.key,id:String(i.id),title:i.name,quantity:i.quantity,price:(s=i.prices)!=null&&s.price?Number(i.prices.price)/Math.pow(10,i.prices.currency_minor_unit||2):0,image:((o=(r=i.images)==null?void 0:r[0])==null?void 0:o.src)||""}})}catch(t){console.warn("[WooCommerceBridge] fetchLiveCart error:",t)}return null}static async applyFragmentsAndUpdateDOM(t,e){if(typeof document>"u")return;if(t&&typeof t=="object")for(const[r,o]of Object.entries(t))try{document.querySelectorAll(r).forEach(n=>{const c=document.createElement("div");c.innerHTML=o.trim();const h=c.firstElementChild;h&&n.parentNode&&n.parentNode.replaceChild(h,n)})}catch{}let i=0;try{const r=await this.fetchLiveCart();r&&r.length>0&&(i=r.reduce((o,a)=>o+(a.quantity||1),0))}catch{}if(document.querySelectorAll(".cart .count, .apus-topcart .count, .footer-mini-cart .count, .mini-cart .count, .header-cart .count, .cart-count, span.count, .elementor-button-icon-qty").forEach(r=>{r.textContent=String(i)}),this.triggerWooCommerceEvents({fragments:t,cart_hash:e},"added_to_cart"),typeof window<"u"){const r=window.location.pathname.toLowerCase();if(r.includes("cart")||r.includes("checkout")){const o=window;o.jQuery&&(o.jQuery(document.body).trigger("update_checkout"),o.jQuery(document.body).trigger("update_wc_div"))}}}static async refreshAndApplyFragments(t){if(!(typeof window>"u")){try{const e=await fetch(`${window.location.origin}/?wc-ajax=get_refreshed_fragments`,{method:"POST",credentials:"include"});if(e.ok){const i=await e.json();await this.applyFragmentsAndUpdateDOM(i==null?void 0:i.fragments,i==null?void 0:i.cart_hash);return}}catch(e){console.warn("[WooCommerceBridge] get_refreshed_fragments failed:",e)}typeof t=="number"&&document.querySelectorAll(".cart .count, .apus-topcart .count, .footer-mini-cart .count, .mini-cart .count, .header-cart .count, .cart-count, span.count, .elementor-button-icon-qty").forEach(i=>{i.textContent=String(t)})}}static async executeCartAddition(t,e=1,i){if(this.isWpStorefront()){try{const s=new FormData;s.append("product_id",String(t)),s.append("quantity",String(e));const r=await fetch(`${window.location.origin}/?wc-ajax=add_to_cart`,{method:"POST",credentials:"include",body:s});if(r.ok){const o=await r.json().catch(()=>({}));return await this.applyFragmentsAndUpdateDOM(o==null?void 0:o.fragments,o==null?void 0:o.cart_hash),{success:!0,message:"Added to cart!",cartData:o}}}catch(s){console.warn("[WooCommerceBridge] wc-ajax add_to_cart error, trying Store API:",s)}try{const s=i||`${window.location.origin}/wp-json/wc/store/v1/cart/add-item`,r=await fetch(s,{method:"POST",headers:this.getHeaders(),credentials:"include",body:JSON.stringify({id:Number(t),quantity:e})});if(r.ok){const o=await r.json();return await this.refreshAndApplyFragments(o==null?void 0:o.items_count),{success:!0,message:"Added to cart!",cartCount:o==null?void 0:o.items_count,cartData:o}}}catch(s){console.warn("[WooCommerceBridge] Direct Store API call failed:",s)}}return this.triggerWooCommerceEvents({items_count:1},"added_to_cart"),{success:!0,message:"Item added to your shopping cart!"}}static async executeCartRemoval(t){if(this.isWpStorefront()){try{const e=await fetch(`${window.location.origin}/wp-json/wc/store/v1/cart`,{method:"GET",headers:this.getHeaders(),credentials:"include"});if(e.ok){const s=((await e.json()).items||[]).find(a=>a.key===String(t)||String(a.id)===String(t)||a.name.toLowerCase().includes(String(t).toLowerCase())),r=s?s.key:String(t),o=await fetch(`${window.location.origin}/wp-json/wc/store/v1/cart/remove-item`,{method:"POST",headers:this.getHeaders(),credentials:"include",body:JSON.stringify({key:r})});if(o.ok){const a=await o.json();return await this.refreshAndApplyFragments(a==null?void 0:a.items_count),{success:!0,message:"Item removed from cart!",cartCount:a==null?void 0:a.items_count,cartData:a}}}}catch(e){console.warn("[WooCommerceBridge] Store API removal failed, trying fallback:",e)}try{const e=new FormData;e.append("cart_item_key",String(t));const i=await fetch(`${window.location.origin}/?wc-ajax=remove_from_cart`,{method:"POST",credentials:"include",body:e});if(i.ok){const s=await i.json().catch(()=>({}));return await this.applyFragmentsAndUpdateDOM(s==null?void 0:s.fragments,s==null?void 0:s.cart_hash),{success:!0,message:"Item removed from cart."}}}catch{}}return await this.refreshAndApplyFragments(0),{success:!0,message:"Item removed from cart."}}static async executeCartUpdate(t,e){if(e<=0)return this.executeCartRemoval(t);if(this.isWpStorefront())try{const i=await fetch(`${window.location.origin}/wp-json/wc/store/v1/cart`,{method:"GET",headers:this.getHeaders(),credentials:"include"});if(i.ok){const r=((await i.json()).items||[]).find(n=>n.key===String(t)||String(n.id)===String(t)||n.name.toLowerCase().includes(String(t).toLowerCase())),o=r?r.key:String(t),a=await fetch(`${window.location.origin}/wp-json/wc/store/v1/cart/update-item`,{method:"POST",headers:this.getHeaders(),credentials:"include",body:JSON.stringify({key:o,quantity:Number(e)})});if(a.ok){const n=await a.json();return await this.refreshAndApplyFragments(n==null?void 0:n.items_count),{success:!0,message:"Cart updated successfully!",cartCount:n==null?void 0:n.items_count,cartData:n}}}}catch(i){console.warn("[WooCommerceBridge] Store API update-item error:",i)}return await this.refreshAndApplyFragments(e),{success:!0,message:"Cart quantity updated."}}static async clearStoreCart(){if(this.isWpStorefront())try{const t=await this.fetchLiveCart();if(t&&t.length>0)for(const e of t)await this.executeCartRemoval(e.key);await this.refreshAndApplyFragments(0)}catch(t){console.warn("[WooCommerceBridge] clearStoreCart error:",t)}}static triggerWooCommerceEvents(t,e="added_to_cart"){if(typeof window>"u")return;const i=window;if(i.jQuery)try{i.jQuery(document.body).trigger("wc_fragment_refresh"),i.jQuery(document.body).trigger(e,[t==null?void 0:t.fragments,t==null?void 0:t.cart_hash]),i.jQuery(document.body).trigger("wc_fragments_refreshed"),i.jQuery(document.body).trigger("wc_fragments_loaded"),i.jQuery(document.body).trigger("update_checkout")}catch{}try{window.dispatchEvent(new CustomEvent("woocommerce:cart_updated",{detail:t})),document.body.dispatchEvent(new CustomEvent(e,{detail:t})),document.body.dispatchEvent(new CustomEvent("wc_fragment_refresh")),document.body.dispatchEvent(new CustomEvent("wc_fragments_refreshed"))}catch{}}}class C{constructor(){u(this,"siteKey","colbolt_live");u(this,"apiUrl","http://localhost:3000");u(this,"customLogoUrl");u(this,"shadowRoot");u(this,"isOpen",!1);u(this,"isActionMenuOpen",!1);u(this,"conversationId",`conv_${Date.now()}`);u(this,"config",null);u(this,"isWaitingForResponse",!1);u(this,"cartItems",[]);this.extractAttributes()}extractAttributes(){const t=document.querySelectorAll("script");for(let i=t.length-1;i>=0;i--){const s=t[i];if(s.src&&(s.src.includes("widget.js")||s.getAttribute("data-site-key"))){const r=s.getAttribute("data-site-key");r&&(this.siteKey=r);const o=s.getAttribute("data-api-url");if(o)this.apiUrl=o.replace(/\/+$/,"");else try{const a=new URL(s.src);a.hostname.includes("colbolt.hawksnfox.com")||(this.apiUrl=a.origin)}catch{}break}}const e=window.UniversalChatbotConfig;e&&(e.siteKey&&(this.siteKey=e.siteKey),e.apiUrl&&(this.apiUrl=e.apiUrl.replace(/\/+$/,"")),e.logoUrl&&(this.customLogoUrl=e.logoUrl))}async init(){const t=document.createElement("div");t.id="universal-chatbot-root",document.body.appendChild(t),this.shadowRoot=t.attachShadow({mode:"open"}),await this.fetchConfig(),this.render(),this.bindEvents(),f.fetchLiveCart().then(e=>{e&&e.length>0&&(this.cartItems=e,this.updateCartUI())}).catch(()=>{})}async fetchConfig(){try{const t=await fetch(`${this.apiUrl}/api/tenant/config?siteKey=${encodeURIComponent(this.siteKey)}`);t.ok&&(this.config=await t.json())}catch(t){console.warn("[UniversalChatbot] Using fallback default config:",t)}this.config?this.customLogoUrl&&(this.config.brand.logoUrl=this.customLogoUrl):this.config={siteKey:this.siteKey,brand:{companyName:"Colbolt",assistantName:"COLBOLT.",logoUrl:this.customLogoUrl||`${this.apiUrl}/static/assistance.gif`,primaryColor:"#16408a",launcherPosition:"bottom-right",welcomeMessage:"Hello! Welcome to Colbolt. I can help you find products (like Bacteriostatic Water, Tirz, Retatrutide), check prices within your budget, or add items directly to your cart. How can I help you today?",suggestedQuestions:["What does Colbolt do?","Show me Tirz products","What is Bacteriostatic Water?","What are your shipping policies?"]},company:{businessName:"Colbolt",aboutUs:"Colbolt provides premium quality research solutions and peptides."},commerceType:"woocommerce",activeTools:["search_products","add_to_cart","tile_calculator"]}}getAvatarHtml(t=36){var i,s;const e=this.customLogoUrl||((s=(i=this.config)==null?void 0:i.brand)==null?void 0:s.logoUrl)||`${this.apiUrl}/static/assistance.gif`;return e?`<img src="${e}" alt="Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" onerror="this.onerror=null;this.src='${this.apiUrl}/static/assistance.gif';">`:`
-      <svg viewBox="0 0 24 24" style="width:${t*.6}px;height:${t*.6}px;fill:currentColor">
-        <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.72V7h2a7 7 0 0 1 7 7v1a3 3 0 0 1-3 3h-1.17l-2.41 2.41A2 2 0 0 1 14 21H10a2 2 0 0 1-1.41-.59L6.17 18H5a3 3 0 0 1-3-3v-1a7 7 0 0 1 7-7h2V5.72c-.6-.34-1-.98-1-1.72a2 2 0 0 1 2-2z"/>
+  `}class g{static isWpStorefront(){return typeof window<"u"&&(window.location.hostname.includes("colbolt.hawksnfox.com")||!!window.wc_store_api_nonce||!!window.wc_add_to_cart_params||!!window.woocommerce_params)}static getHeaders(){var e,i;const t={"Content-Type":"application/json",Accept:"application/json"};if(typeof window<"u"){const o=window.wc_store_api_nonce||((e=window.UniversalChatbotConfig)==null?void 0:e.nonce)||((i=document.querySelector('meta[name="wc-store-api-nonce"]'))==null?void 0:i.content);o&&(t.Nonce=o)}return t}static async fetchLiveCart(){if(!this.isWpStorefront())return null;try{const t=await fetch(`${window.location.origin}/wp-json/wc/store/v1/cart`,{method:"GET",headers:this.getHeaders(),credentials:"include"});if(t.ok)return((await t.json()).items||[]).map(i=>{var o,r,s;return{key:i.key,id:String(i.id),title:i.name,quantity:i.quantity,price:(o=i.prices)!=null&&o.price?Number(i.prices.price)/Math.pow(10,i.prices.currency_minor_unit||2):0,image:((s=(r=i.images)==null?void 0:r[0])==null?void 0:s.src)||""}})}catch(t){console.warn("[WooCommerceBridge] fetchLiveCart error:",t)}return null}static async applyFragmentsAndUpdateDOM(t,e){if(typeof document>"u")return;if(t&&typeof t=="object")for(const[r,s]of Object.entries(t))try{document.querySelectorAll(r).forEach(n=>{const c=document.createElement("div");c.innerHTML=s.trim();const d=c.firstElementChild;d&&n.parentNode&&n.parentNode.replaceChild(d,n)})}catch{}let i=0;try{const r=await this.fetchLiveCart();r&&r.length>0&&(i=r.reduce((s,a)=>s+(a.quantity||1),0))}catch{}if(document.querySelectorAll(".cart .count, .apus-topcart .count, .footer-mini-cart .count, .mini-cart .count, .header-cart .count, .cart-count, span.count, .elementor-button-icon-qty").forEach(r=>{r.textContent=String(i)}),this.triggerWooCommerceEvents({fragments:t,cart_hash:e},"added_to_cart"),typeof window<"u"){const r=window.location.pathname.toLowerCase();if(r.includes("cart")||r.includes("checkout")){const s=window;s.jQuery&&(s.jQuery(document.body).trigger("update_checkout"),s.jQuery(document.body).trigger("update_wc_div"))}}}static async refreshAndApplyFragments(t){if(!(typeof window>"u")){try{const e=await fetch(`${window.location.origin}/?wc-ajax=get_refreshed_fragments`,{method:"POST",credentials:"include"});if(e.ok){const i=await e.json();await this.applyFragmentsAndUpdateDOM(i==null?void 0:i.fragments,i==null?void 0:i.cart_hash);return}}catch(e){console.warn("[WooCommerceBridge] get_refreshed_fragments failed:",e)}typeof t=="number"&&document.querySelectorAll(".cart .count, .apus-topcart .count, .footer-mini-cart .count, .mini-cart .count, .header-cart .count, .cart-count, span.count, .elementor-button-icon-qty").forEach(i=>{i.textContent=String(t)})}}static async executeCartAddition(t,e=1,i){if(this.isWpStorefront()){try{const o=new FormData;o.append("product_id",String(t)),o.append("quantity",String(e));const r=await fetch(`${window.location.origin}/?wc-ajax=add_to_cart`,{method:"POST",credentials:"include",body:o});if(r.ok){const s=await r.json().catch(()=>({}));return await this.applyFragmentsAndUpdateDOM(s==null?void 0:s.fragments,s==null?void 0:s.cart_hash),{success:!0,message:"Added to cart!",cartData:s}}}catch(o){console.warn("[WooCommerceBridge] wc-ajax add_to_cart error, trying Store API:",o)}try{const o=i||`${window.location.origin}/wp-json/wc/store/v1/cart/add-item`,r=await fetch(o,{method:"POST",headers:this.getHeaders(),credentials:"include",body:JSON.stringify({id:Number(t),quantity:e})});if(r.ok){const s=await r.json();return await this.refreshAndApplyFragments(s==null?void 0:s.items_count),{success:!0,message:"Added to cart!",cartCount:s==null?void 0:s.items_count,cartData:s}}}catch(o){console.warn("[WooCommerceBridge] Direct Store API call failed:",o)}}return this.triggerWooCommerceEvents({items_count:1},"added_to_cart"),{success:!0,message:"Item added to your shopping cart!"}}static async executeCartRemoval(t){if(this.isWpStorefront()){try{const e=await fetch(`${window.location.origin}/wp-json/wc/store/v1/cart`,{method:"GET",headers:this.getHeaders(),credentials:"include"});if(e.ok){const o=((await e.json()).items||[]).find(a=>a.key===String(t)||String(a.id)===String(t)||a.name.toLowerCase().includes(String(t).toLowerCase())),r=o?o.key:String(t),s=await fetch(`${window.location.origin}/wp-json/wc/store/v1/cart/remove-item`,{method:"POST",headers:this.getHeaders(),credentials:"include",body:JSON.stringify({key:r})});if(s.ok){const a=await s.json();return await this.refreshAndApplyFragments(a==null?void 0:a.items_count),{success:!0,message:"Item removed from cart!",cartCount:a==null?void 0:a.items_count,cartData:a}}}}catch(e){console.warn("[WooCommerceBridge] Store API removal failed, trying fallback:",e)}try{const e=new FormData;e.append("cart_item_key",String(t));const i=await fetch(`${window.location.origin}/?wc-ajax=remove_from_cart`,{method:"POST",credentials:"include",body:e});if(i.ok){const o=await i.json().catch(()=>({}));return await this.applyFragmentsAndUpdateDOM(o==null?void 0:o.fragments,o==null?void 0:o.cart_hash),{success:!0,message:"Item removed from cart."}}}catch{}}return await this.refreshAndApplyFragments(0),{success:!0,message:"Item removed from cart."}}static async executeCartUpdate(t,e){if(e<=0)return this.executeCartRemoval(t);if(this.isWpStorefront())try{const i=await fetch(`${window.location.origin}/wp-json/wc/store/v1/cart`,{method:"GET",headers:this.getHeaders(),credentials:"include"});if(i.ok){const r=((await i.json()).items||[]).find(n=>n.key===String(t)||String(n.id)===String(t)||n.name.toLowerCase().includes(String(t).toLowerCase())),s=r?r.key:String(t),a=await fetch(`${window.location.origin}/wp-json/wc/store/v1/cart/update-item`,{method:"POST",headers:this.getHeaders(),credentials:"include",body:JSON.stringify({key:s,quantity:Number(e)})});if(a.ok){const n=await a.json();return await this.refreshAndApplyFragments(n==null?void 0:n.items_count),{success:!0,message:"Cart updated successfully!",cartCount:n==null?void 0:n.items_count,cartData:n}}}}catch(i){console.warn("[WooCommerceBridge] Store API update-item error:",i)}return await this.refreshAndApplyFragments(e),{success:!0,message:"Cart quantity updated."}}static async clearStoreCart(){if(this.isWpStorefront())try{const t=await this.fetchLiveCart();if(t&&t.length>0)for(const e of t)await this.executeCartRemoval(e.key);await this.refreshAndApplyFragments(0)}catch(t){console.warn("[WooCommerceBridge] clearStoreCart error:",t)}}static triggerWooCommerceEvents(t,e="added_to_cart"){if(typeof window>"u")return;const i=window;if(i.jQuery)try{i.jQuery(document.body).trigger("wc_fragment_refresh"),i.jQuery(document.body).trigger(e,[t==null?void 0:t.fragments,t==null?void 0:t.cart_hash]),i.jQuery(document.body).trigger("wc_fragments_refreshed"),i.jQuery(document.body).trigger("wc_fragments_loaded"),i.jQuery(document.body).trigger("update_checkout")}catch{}try{window.dispatchEvent(new CustomEvent("woocommerce:cart_updated",{detail:t})),document.body.dispatchEvent(new CustomEvent(e,{detail:t})),document.body.dispatchEvent(new CustomEvent("wc_fragment_refresh")),document.body.dispatchEvent(new CustomEvent("wc_fragments_refreshed"))}catch{}}}class C{constructor(){u(this,"siteKey","colbolt_live");u(this,"apiUrl","http://localhost:3000");u(this,"customLogoUrl");u(this,"shadowRoot");u(this,"isOpen",!1);u(this,"isActionMenuOpen",!1);u(this,"conversationId",`conv_${Date.now()}`);u(this,"config",null);u(this,"isWaitingForResponse",!1);u(this,"cartItems",[]);this.extractAttributes()}extractAttributes(){const t=document.querySelectorAll("script");for(let i=t.length-1;i>=0;i--){const o=t[i];if(o.src&&(o.src.includes("widget.js")||o.getAttribute("data-site-key"))){const r=o.getAttribute("data-site-key");r&&(this.siteKey=r);const s=o.getAttribute("data-api-url");if(s)this.apiUrl=s.replace(/\/+$/,"");else try{const a=new URL(o.src);a.hostname.includes("colbolt.hawksnfox.com")||(this.apiUrl=a.origin)}catch{}break}}const e=window.UniversalChatbotConfig;e&&(e.siteKey&&(this.siteKey=e.siteKey),e.apiUrl&&(this.apiUrl=e.apiUrl.replace(/\/+$/,"")),e.logoUrl&&(this.customLogoUrl=e.logoUrl))}async init(){const t=document.createElement("div");t.id="universal-chatbot-root",document.body.appendChild(t),this.shadowRoot=t.attachShadow({mode:"open"}),await this.fetchConfig(),this.render(),this.bindEvents(),g.fetchLiveCart().then(e=>{e&&e.length>0&&(this.cartItems=e,this.updateCartUI())}).catch(()=>{})}async fetchConfig(){try{const t=await fetch(`${this.apiUrl}/api/tenant/config?siteKey=${encodeURIComponent(this.siteKey)}`);t.ok&&(this.config=await t.json())}catch(t){console.warn("[UniversalChatbot] Using fallback default config:",t)}this.config?this.customLogoUrl&&(this.customLogoUrl.includes("assistance.gif")||(this.config.brand.logoUrl=this.customLogoUrl)):this.config={siteKey:this.siteKey,brand:{companyName:"Colbolt",assistantName:"COLBOLT.",logoUrl:this.customLogoUrl||"https://colbolt.hawksnfox.com/wp-content/uploads/2021/05/colbol.png",primaryColor:"#0d2958",launcherPosition:"bottom-right",welcomeMessage:"Hello! Welcome to Colbolt. I can help you find products (like Bacteriostatic Water, Tirz, Retatrutide), check prices within your budget, or add items directly to your cart. How can I help you today?",suggestedQuestions:["What does Colbolt do?","Show me Tirz products","What is Bacteriostatic Water?","What are your shipping policies?"]},company:{businessName:"Colbolt",aboutUs:"Colbolt provides premium quality research solutions and peptides."},commerceType:"woocommerce",activeTools:["search_products","add_to_cart","tile_calculator"]}}getAvatarHtml(t=36){var r,s;const e=this.customLogoUrl||((s=(r=this.config)==null?void 0:r.brand)==null?void 0:s.logoUrl),i=e&&!e.includes("assistance.gif")?e:"https://colbolt.hawksnfox.com/wp-content/uploads/2021/05/colbol.png",o=`
+      <svg viewBox="0 0 48 48" style="width:100%;height:100%;display:block;" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="cGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#0284c7" />
+            <stop offset="50%" stop-color="#16408a" />
+            <stop offset="100%" stop-color="#07152b" />
+          </linearGradient>
+          <linearGradient id="neonGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#38bdf8" />
+            <stop offset="100%" stop-color="#10b981" />
+          </linearGradient>
+        </defs>
+        <rect width="48" height="48" rx="24" fill="url(#cGrad)" />
+        <polygon points="24,10 35,16 35,29 24,35 13,29 13,16" stroke="url(#neonGrad)" stroke-width="2" fill="none" opacity="0.85" />
+        <circle cx="24" cy="10" r="2.5" fill="#38bdf8" />
+        <circle cx="35" cy="16" r="2.5" fill="#38bdf8" />
+        <circle cx="35" cy="29" r="2.5" fill="#10b981" />
+        <circle cx="24" cy="35" r="2.5" fill="#10b981" />
+        <circle cx="13" cy="29" r="2.5" fill="#38bdf8" />
+        <circle cx="13" cy="16" r="2.5" fill="#38bdf8" />
+        <path d="M28 18C26.5 17 24.5 17 23 18C20 20 20 25 23 27C24.5 28 26.5 28 28 27" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" fill="none" />
       </svg>
-    `}getTimeString(){return new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}render(){var n;const t=(n=this.config)==null?void 0:n.brand,e=(t==null?void 0:t.primaryColor)||"#1e73be",i=(t==null?void 0:t.launcherPosition)||"bottom-right",s=(t==null?void 0:t.companyName)||"Colbolt",r=(t==null?void 0:t.assistantName)||"COLBOLT.",o=document.createElement("style");o.textContent=m(e,i),this.shadowRoot.appendChild(o);const a=document.createElement("div");a.className="chatbot-container",a.innerHTML=`
+    `.replace(/\n\s*/g,"");return`<img src="${i}" alt="Colbolt" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;background:#ffffff;" onerror="this.outerHTML='${o}';">`}getTimeString(){return new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}render(){var n;const t=(n=this.config)==null?void 0:n.brand,e=(t==null?void 0:t.primaryColor)||"#0d2958",i=(t==null?void 0:t.launcherPosition)||"bottom-right",o=(t==null?void 0:t.companyName)||"Colbolt",r=(t==null?void 0:t.assistantName)||"COLBOLT.",s=document.createElement("style");s.textContent=m(e,i),this.shadowRoot.appendChild(s);const a=document.createElement("div");a.className="chatbot-container",a.innerHTML=`
       <!-- High-End Liquid Glass Floating Pill Launcher -->
       <div class="launcher-pill" id="launcherBtn" role="button" tabindex="0" aria-label="Open Chat">
         <div class="launcher-avatar-wrap">
@@ -1206,16 +1408,16 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
 
       <!-- Chat Window -->
       <div class="chat-window hidden" id="chatWindow">
-        <!-- Branded Gradient Banner Header (YANA Style) -->
+        <!-- Branded Gradient Banner Header -->
         <div class="chat-header-banner">
           <div class="banner-brand-info">
             <div class="banner-mascot">
               ${this.getAvatarHtml(52)}
             </div>
             <div class="banner-text-group">
-              <span class="banner-greeting">Hi, I am</span>
+              <span class="banner-greeting">Verified Assistant</span>
               <span class="banner-assistant-name">${this.escapeHtml(r)}</span>
-              <span class="banner-tagline">Research Concierge & Support</span>
+              <span class="banner-tagline"><span class="banner-tagline-dot"></span> Research Concierge • Online</span>
             </div>
           </div>
           <div class="banner-controls">
@@ -1232,7 +1434,7 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
 
         <!-- Store Sub-Intro Banner -->
         <div class="store-sub-intro">
-          <div class="store-title">Welcome to ${this.escapeHtml(s)}</div>
+          <div class="store-title">Welcome to ${this.escapeHtml(o)}</div>
           <div class="store-subtitle">Ask anything about compounds, research, live orders, or cart</div>
         </div>
 
@@ -1335,16 +1537,16 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
           </div>
         </div>
       </div>
-    `,this.shadowRoot.appendChild(a)}bindEvents(){const t=this.shadowRoot.getElementById("launcherBtn"),e=this.shadowRoot.getElementById("closeBtn"),i=this.shadowRoot.getElementById("sendBtn"),s=this.shadowRoot.getElementById("actionPlusBtn"),r=this.shadowRoot.getElementById("actionMenu"),o=this.shadowRoot.getElementById("chatInput"),a=this.shadowRoot.getElementById("chatBody");t==null||t.addEventListener("click",()=>this.toggle()),e==null||e.addEventListener("click",()=>this.toggle(!1)),s==null||s.addEventListener("click",g=>{g.stopPropagation(),this.isActionMenuOpen=!this.isActionMenuOpen,this.isActionMenuOpen?r==null||r.classList.remove("hidden"):r==null||r.classList.add("hidden")}),a==null||a.addEventListener("click",()=>{this.isActionMenuOpen&&(this.isActionMenuOpen=!1,r==null||r.classList.add("hidden"))}),r==null||r.addEventListener("click",g=>{const d=g.target.closest(".action-menu-item");if(!d)return;const l=d.getAttribute("data-action");this.isActionMenuOpen=!1,r.classList.add("hidden"),l==="manage_cart"?this.openCartDrawer():l==="track_order"?this.sendMessage("Track my order"):l==="all_products"?this.sendMessage("Show me all products"):l==="tile_calculator"?this.renderTileCalculatorWidget():l==="shipping"?this.sendMessage("What is your shipping policy?"):l==="clear_chat"&&this.clearChat()});const n=this.shadowRoot.getElementById("cartStripToggle"),c=this.shadowRoot.getElementById("cartStripManageBtn"),h=this.shadowRoot.getElementById("closeCartDrawerBtn"),w=this.shadowRoot.getElementById("drawerClearCartBtn"),b=this.shadowRoot.getElementById("cartDrawerItems");n==null||n.addEventListener("click",()=>this.openCartDrawer()),c==null||c.addEventListener("click",()=>this.openCartDrawer()),h==null||h.addEventListener("click",()=>this.closeCartDrawer()),w==null||w.addEventListener("click",()=>this.handleClearAllCart()),b==null||b.addEventListener("click",g=>{const d=g.target,l=d.classList.contains("drawer-item-remove-btn")?d:d.closest(".drawer-item-remove-btn");if(l){const p=l.getAttribute("data-product-id"),v=l.getAttribute("data-product-title");p&&this.handleRemoveFromCart(p,v||"Item")}}),i==null||i.addEventListener("click",()=>this.handleUserSend()),o==null||o.addEventListener("keydown",g=>{g.key==="Enter"?(g.preventDefault(),this.handleUserSend()):g.key==="Escape"&&this.isOpen&&this.toggle(!1)}),a==null||a.addEventListener("click",g=>{var l;const d=g.target;if(d.classList.contains("quick-reply-btn")){const p=d.getAttribute("data-text");p&&this.sendMessage(p)}else if(d.classList.contains("add-to-cart-btn")||d.closest(".add-to-cart-btn")){const p=d.classList.contains("add-to-cart-btn")?d:d.closest(".add-to-cart-btn"),v=p.getAttribute("data-product-id"),y=p.closest(".product-card"),S=y==null?void 0:y.querySelector(".qty-display"),I=S?parseInt(S.textContent||"1",10):1;v&&this.handleAddToCart(p,v,I)}else if(d.classList.contains("qty-btn")){const p=d.getAttribute("data-action")==="plus",v=(l=d.parentElement)==null?void 0:l.querySelector(".qty-display");if(v){let y=parseInt(v.textContent||"1",10);y=p?y+1:Math.max(1,y-1),v.textContent=String(y)}}else d.classList.contains("tile-calc-submit-btn")&&this.handleTileCalculation(d)})}toggle(t){this.isOpen=t!==void 0?t:!this.isOpen;const e=this.shadowRoot.getElementById("chatWindow"),i=this.shadowRoot.getElementById("launcherBtn"),s=this.shadowRoot.getElementById("chatInput");this.isOpen?(e==null||e.classList.remove("hidden"),i&&(i.style.opacity="0.9"),setTimeout(()=>s==null?void 0:s.focus(),150)):(e==null||e.classList.add("hidden"),i&&(i.style.opacity="1"))}handleUserSend(){const t=this.shadowRoot.getElementById("chatInput"),e=t.value.trim();!e||this.isWaitingForResponse||(t.value="",this.sendMessage(e))}async sendMessage(t){const e=this.shadowRoot.getElementById("chatBody");if(!e)return;const i=document.createElement("div");i.className="message-row user",i.innerHTML=`
+    `,this.shadowRoot.appendChild(a)}bindEvents(){const t=this.shadowRoot.getElementById("launcherBtn"),e=this.shadowRoot.getElementById("closeBtn"),i=this.shadowRoot.getElementById("sendBtn"),o=this.shadowRoot.getElementById("actionPlusBtn"),r=this.shadowRoot.getElementById("actionMenu"),s=this.shadowRoot.getElementById("chatInput"),a=this.shadowRoot.getElementById("chatBody");t==null||t.addEventListener("click",()=>this.toggle()),e==null||e.addEventListener("click",()=>this.toggle(!1)),o==null||o.addEventListener("click",f=>{f.stopPropagation(),this.isActionMenuOpen=!this.isActionMenuOpen,this.isActionMenuOpen?r==null||r.classList.remove("hidden"):r==null||r.classList.add("hidden")}),a==null||a.addEventListener("click",()=>{this.isActionMenuOpen&&(this.isActionMenuOpen=!1,r==null||r.classList.add("hidden"))}),r==null||r.addEventListener("click",f=>{const l=f.target.closest(".action-menu-item");if(!l)return;const p=l.getAttribute("data-action");this.isActionMenuOpen=!1,r.classList.add("hidden"),p==="manage_cart"?this.openCartDrawer():p==="track_order"?this.sendMessage("Track my order"):p==="all_products"?this.sendMessage("Show me all products"):p==="tile_calculator"?this.renderTileCalculatorWidget():p==="shipping"?this.sendMessage("What is your shipping policy?"):p==="clear_chat"&&this.clearChat()});const n=this.shadowRoot.getElementById("cartStripToggle"),c=this.shadowRoot.getElementById("cartStripManageBtn"),d=this.shadowRoot.getElementById("closeCartDrawerBtn"),w=this.shadowRoot.getElementById("drawerClearCartBtn"),b=this.shadowRoot.getElementById("cartDrawerItems");n==null||n.addEventListener("click",()=>this.openCartDrawer()),c==null||c.addEventListener("click",()=>this.openCartDrawer()),d==null||d.addEventListener("click",()=>this.closeCartDrawer()),w==null||w.addEventListener("click",()=>this.handleClearAllCart()),b==null||b.addEventListener("click",f=>{const l=f.target,p=l.classList.contains("drawer-item-remove-btn")?l:l.closest(".drawer-item-remove-btn");if(p){const h=p.getAttribute("data-product-id"),y=p.getAttribute("data-product-title");h&&this.handleRemoveFromCart(h,y||"Item")}}),i==null||i.addEventListener("click",()=>this.handleUserSend()),s==null||s.addEventListener("keydown",f=>{f.key==="Enter"?(f.preventDefault(),this.handleUserSend()):f.key==="Escape"&&this.isOpen&&this.toggle(!1)}),a==null||a.addEventListener("click",f=>{var p;const l=f.target;if(l.classList.contains("quick-reply-btn")){const h=l.getAttribute("data-text");h&&this.sendMessage(h)}else if(l.classList.contains("add-to-cart-btn")||l.closest(".add-to-cart-btn")){const h=l.classList.contains("add-to-cart-btn")?l:l.closest(".add-to-cart-btn"),y=h.getAttribute("data-product-id"),v=h.closest(".product-card"),S=v==null?void 0:v.querySelector(".qty-display"),B=S?parseInt(S.textContent||"1",10):1;y&&this.handleAddToCart(h,y,B)}else if(l.classList.contains("qty-btn")){const h=l.getAttribute("data-action")==="plus",y=(p=l.parentElement)==null?void 0:p.querySelector(".qty-display");if(y){let v=parseInt(y.textContent||"1",10);v=h?v+1:Math.max(1,v-1),y.textContent=String(v)}}else l.classList.contains("tile-calc-submit-btn")&&this.handleTileCalculation(l)})}toggle(t){this.isOpen=t!==void 0?t:!this.isOpen;const e=this.shadowRoot.getElementById("chatWindow"),i=this.shadowRoot.getElementById("launcherBtn"),o=this.shadowRoot.getElementById("chatInput");this.isOpen?(e==null||e.classList.remove("hidden"),i&&(i.style.opacity="0.9"),setTimeout(()=>o==null?void 0:o.focus(),150)):(e==null||e.classList.add("hidden"),i&&(i.style.opacity="1"))}handleUserSend(){const t=this.shadowRoot.getElementById("chatInput"),e=t.value.trim();!e||this.isWaitingForResponse||(t.value="",this.sendMessage(e))}async sendMessage(t){const e=this.shadowRoot.getElementById("chatBody");if(!e)return;const i=document.createElement("div");i.className="message-row user",i.innerHTML=`
       <div class="message-content-group">
         <div class="message-bubble user">${this.escapeHtml(t)}</div>
         <span class="message-timestamp">${this.getTimeString()}</span>
       </div>
-    `,e.appendChild(i);const s=document.createElement("div");s.className="typing-indicator",s.id="activeTypingIndicator",s.innerHTML=`
+    `,e.appendChild(i);const o=document.createElement("div");o.className="typing-indicator",o.id="activeTypingIndicator",o.innerHTML=`
       <span class="typing-dot"></span>
       <span class="typing-dot"></span>
       <span class="typing-dot"></span>
-    `,e.appendChild(s),e.scrollTop=e.scrollHeight,this.isWaitingForResponse=!0;try{const r=await fetch(`${this.apiUrl}/api/chat/message`,{method:"POST",headers:{"Content-Type":"application/json","X-Site-Key":this.siteKey},body:JSON.stringify({siteKey:this.siteKey,conversationId:this.conversationId,message:t,cartItems:this.cartItems})});if(s.remove(),this.isWaitingForResponse=!1,!r.ok)throw new Error(`Server returned ${r.status}`);const o=await r.json();this.renderBotResponse(o)}catch{s.remove(),this.isWaitingForResponse=!1,this.renderBotResponse({message:"I am currently having trouble reaching the store catalog. Please try again in a moment."})}}renderBotResponse(t){const e=this.shadowRoot.getElementById("chatBody");if(!e)return;if(t.cartAction){const a=t.cartAction;if(a.type==="remove")f.executeCartRemoval(a.productId||a.title).catch(()=>{}),this.cartItems=this.cartItems.filter(n=>n.id!==String(a.productId)&&(!a.title||!n.title.toLowerCase().includes(String(a.title).toLowerCase()))),this.updateCartUI();else if(a.type==="add"&&a.item){f.executeCartAddition(a.item.id,a.item.quantity||1).catch(()=>{});const n=this.cartItems.find(c=>c.id===String(a.item.id));n?n.quantity+=a.item.quantity||1:this.cartItems.push({id:String(a.item.id),title:a.item.title,price:Number(a.item.price||0),quantity:a.item.quantity||1}),this.updateCartUI()}else if(a.type==="update"&&a.item){f.executeCartUpdate(a.item.id,a.item.quantity).catch(()=>{});const n=this.cartItems.find(c=>c.id===String(a.item.id));n&&(n.quantity=a.item.quantity),this.updateCartUI()}else a.type==="clear"&&(f.clearStoreCart().catch(()=>{}),this.cartItems=[],this.updateCartUI())}const i=document.createElement("div");i.className="message-row assistant";const s=this.formatMarkdown(t.message||"");let r="";Array.isArray(t.productCards)&&t.productCards.length>0&&(r=`
+    `,e.appendChild(o),e.scrollTop=e.scrollHeight,this.isWaitingForResponse=!0;try{const r=await fetch(`${this.apiUrl}/api/chat/message`,{method:"POST",headers:{"Content-Type":"application/json","X-Site-Key":this.siteKey},body:JSON.stringify({siteKey:this.siteKey,conversationId:this.conversationId,message:t,cartItems:this.cartItems})});if(o.remove(),this.isWaitingForResponse=!1,!r.ok)throw new Error(`Server returned ${r.status}`);const s=await r.json();this.renderBotResponse(s)}catch{o.remove(),this.isWaitingForResponse=!1,this.renderBotResponse({message:"I am currently having trouble reaching the store catalog. Please try again in a moment."})}}renderBotResponse(t){const e=this.shadowRoot.getElementById("chatBody");if(!e)return;if(t.cartAction){const a=t.cartAction;if(a.type==="remove")g.executeCartRemoval(a.productId||a.title).catch(()=>{}),this.cartItems=this.cartItems.filter(n=>n.id!==String(a.productId)&&(!a.title||!n.title.toLowerCase().includes(String(a.title).toLowerCase()))),this.updateCartUI();else if(a.type==="add"&&a.item){g.executeCartAddition(a.item.id,a.item.quantity||1).catch(()=>{});const n=this.cartItems.find(c=>c.id===String(a.item.id));n?n.quantity+=a.item.quantity||1:this.cartItems.push({id:String(a.item.id),title:a.item.title,price:Number(a.item.price||0),quantity:a.item.quantity||1}),this.updateCartUI()}else if(a.type==="update"&&a.item){g.executeCartUpdate(a.item.id,a.item.quantity).catch(()=>{});const n=this.cartItems.find(c=>c.id===String(a.item.id));n&&(n.quantity=a.item.quantity),this.updateCartUI()}else a.type==="clear"&&(g.clearStoreCart().catch(()=>{}),this.cartItems=[],this.updateCartUI())}const i=document.createElement("div");i.className="message-row assistant";const o=this.formatMarkdown(t.message||"");let r="";Array.isArray(t.productCards)&&t.productCards.length>0&&(r=`
         <div class="product-cards-container">
           ${t.productCards.map(a=>{var n;return`
             <div class="product-card">
@@ -1374,7 +1576,7 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
             </div>
           `}).join("")}
         </div>
-      `);let o="";Array.isArray(t.quickReplies)&&t.quickReplies.length>0&&(o=`
+      `);let s="";Array.isArray(t.quickReplies)&&t.quickReplies.length>0&&(s=`
         <div class="quick-replies">
           ${t.quickReplies.map(a=>`
             <button class="quick-reply-btn" data-text="${this.escapeHtml(a.actionText||a.label)}">${this.escapeHtml(a.label)}</button>
@@ -1386,11 +1588,11 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
       </div>
       <div class="message-content-group">
         <div class="message-bubble assistant">
-          ${s}
+          ${o}
           ${r}
         </div>
         <span class="message-timestamp">${this.getTimeString()}</span>
-        ${o}
+        ${s}
       </div>
     `,e.appendChild(i),e.scrollTop=e.scrollHeight}renderTileCalculatorWidget(){const t=this.shadowRoot.getElementById("chatBody");if(!t)return;const e=document.createElement("div");e.className="message-row assistant",e.innerHTML=`
       <div class="message-avatar">
@@ -1425,11 +1627,11 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
         </div>
         <span class="message-timestamp">${this.getTimeString()}</span>
       </div>
-    `,t.appendChild(e),t.scrollTop=t.scrollHeight}handleTileCalculation(t){var b,g,d,l;const e=t.closest(".tile-calc-card");if(!e)return;const i=parseFloat(((b=e.querySelector(".tile-input-len"))==null?void 0:b.value)||"0"),s=parseFloat(((g=e.querySelector(".tile-input-wid"))==null?void 0:g.value)||"0"),r=parseFloat(((d=e.querySelector(".tile-input-box"))==null?void 0:d.value)||"16"),o=parseFloat(((l=e.querySelector(".tile-input-waste"))==null?void 0:l.value)||"10"),a=e.querySelector(".tile-calc-result");if(!a)return;if(i<=0||s<=0){a.style.display="block",a.style.background="#fef2f2",a.style.color="#991b1b",a.style.borderColor="#fecaca",a.textContent="Please enter valid room dimensions greater than 0.";return}const n=i*s,c=n*o/100,h=n+c,w=Math.ceil(h/(r||16));a.style.display="block",a.style.background="#f0fdf4",a.style.color="#166534",a.style.borderColor="#bbf7d0",a.innerHTML=`
+    `,t.appendChild(e),t.scrollTop=t.scrollHeight}handleTileCalculation(t){var b,f,l,p;const e=t.closest(".tile-calc-card");if(!e)return;const i=parseFloat(((b=e.querySelector(".tile-input-len"))==null?void 0:b.value)||"0"),o=parseFloat(((f=e.querySelector(".tile-input-wid"))==null?void 0:f.value)||"0"),r=parseFloat(((l=e.querySelector(".tile-input-box"))==null?void 0:l.value)||"16"),s=parseFloat(((p=e.querySelector(".tile-input-waste"))==null?void 0:p.value)||"10"),a=e.querySelector(".tile-calc-result");if(!a)return;if(i<=0||o<=0){a.style.display="block",a.style.background="#fef2f2",a.style.color="#991b1b",a.style.borderColor="#fecaca",a.textContent="Please enter valid room dimensions greater than 0.";return}const n=i*o,c=n*s/100,d=n+c,w=Math.ceil(d/(r||16));a.style.display="block",a.style.background="#f0fdf4",a.style.color="#166534",a.style.borderColor="#bbf7d0",a.innerHTML=`
       <strong>Calculation Result:</strong><br>
       • Room Floor Area: <strong>${n.toFixed(1)} sq ft</strong><br>
-      • Recommended Wastage (${o}%): <strong>+${c.toFixed(1)} sq ft</strong><br>
-      • Total Area to Cover: <strong>${h.toFixed(1)} sq ft</strong><br>
+      • Recommended Wastage (${s}%): <strong>+${c.toFixed(1)} sq ft</strong><br>
+      • Total Area to Cover: <strong>${d.toFixed(1)} sq ft</strong><br>
       • Boxes Needed (${r} sq ft/box): <strong>${w} boxes</strong>
     `}clearChat(){const t=this.shadowRoot.getElementById("chatBody");t&&(this.cartItems=[],this.conversationId=`conv_${Date.now()}`,fetch(`${this.apiUrl}/api/cart/clear`,{method:"POST",headers:{"Content-Type":"application/json","X-Site-Key":this.siteKey},body:JSON.stringify({siteKey:this.siteKey,conversationId:this.conversationId})}).catch(()=>{}),t.innerHTML=`
       <div class="message-row assistant">
@@ -1448,7 +1650,7 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
           </div>
         </div>
       </div>
-    `)}async handleAddToCart(t,e,i){var w,b;if(t.getAttribute("data-loading")==="true")return;t.setAttribute("data-loading","true");const s=t.innerHTML;t.innerHTML="Adding...",t.style.opacity="0.7";const r=t.closest(".product-card"),o=r==null?void 0:r.querySelector(".product-title"),a=((w=o==null?void 0:o.textContent)==null?void 0:w.trim())||"Selected Product",n=r==null?void 0:r.querySelector(".product-price"),c=((b=n==null?void 0:n.textContent)==null?void 0:b.replace(/[^0-9.]/g,""))||"0",h=parseFloat(c)||0;try{const g=await f.executeCartAddition(e,i);t.innerHTML="✓ Added to Cart",t.classList.add("added"),t.style.opacity="1";const d=this.cartItems.find(p=>p.id===e);d?d.quantity+=i:this.cartItems.push({id:e,title:a,price:h,quantity:i}),this.updateCartUI(),fetch(`${this.apiUrl}/api/cart/add`,{method:"POST",headers:{"Content-Type":"application/json","X-Site-Key":this.siteKey},body:JSON.stringify({siteKey:this.siteKey,conversationId:this.conversationId,productId:e,quantity:i})}).catch(()=>{});const l=this.shadowRoot.getElementById("chatBody");if(l){const p=document.createElement("div");p.className="message-row assistant",p.innerHTML=`
+    `)}async handleAddToCart(t,e,i){var w,b;if(t.getAttribute("data-loading")==="true")return;t.setAttribute("data-loading","true");const o=t.innerHTML;t.innerHTML="Adding...",t.style.opacity="0.7";const r=t.closest(".product-card"),s=r==null?void 0:r.querySelector(".product-title"),a=((w=s==null?void 0:s.textContent)==null?void 0:w.trim())||"Selected Product",n=r==null?void 0:r.querySelector(".product-price"),c=((b=n==null?void 0:n.textContent)==null?void 0:b.replace(/[^0-9.]/g,""))||"0",d=parseFloat(c)||0;try{const f=await g.executeCartAddition(e,i);t.innerHTML="✓ Added to Cart",t.classList.add("added"),t.style.opacity="1";const l=this.cartItems.find(h=>h.id===e);l?l.quantity+=i:this.cartItems.push({id:e,title:a,price:d,quantity:i}),this.updateCartUI(),fetch(`${this.apiUrl}/api/cart/add`,{method:"POST",headers:{"Content-Type":"application/json","X-Site-Key":this.siteKey},body:JSON.stringify({siteKey:this.siteKey,conversationId:this.conversationId,productId:e,quantity:i})}).catch(()=>{});const p=this.shadowRoot.getElementById("chatBody");if(p){const h=document.createElement("div");h.className="message-row assistant",h.innerHTML=`
           <div class="message-avatar">
             ${this.getAvatarHtml(34)}
           </div>
@@ -1462,13 +1664,13 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
             </div>
             <span class="message-timestamp">${this.getTimeString()}</span>
           </div>
-        `,l.appendChild(p),l.scrollTop=l.scrollHeight}setTimeout(()=>{t.innerHTML=s,t.classList.remove("added"),t.removeAttribute("data-loading")},3500)}catch{t.innerHTML="Error",t.removeAttribute("data-loading"),setTimeout(()=>{t.innerHTML=s,t.style.opacity="1"},2e3)}}updateCartUI(){const t=this.shadowRoot.getElementById("inchatCartStrip"),e=this.shadowRoot.getElementById("cartStripCountText"),i=this.shadowRoot.getElementById("cartStripTotalText"),s=this.shadowRoot.getElementById("drawerCartBadge"),r=this.shadowRoot.getElementById("drawerTotalPrice"),o=this.shadowRoot.getElementById("cartDrawerItems"),a=this.cartItems.reduce((c,h)=>c+(h.quantity||1),0),n=this.cartItems.reduce((c,h)=>c+(h.price||0)*(h.quantity||1),0);t&&(a>0?(t.classList.remove("hidden"),e&&(e.innerHTML=`<strong>${a}</strong> ${a===1?"item":"items"}`),i&&(i.textContent=`• $${n.toFixed(2)}`)):t.classList.add("hidden")),s&&(s.textContent=String(a)),r&&(r.textContent=`$${n.toFixed(2)}`),o&&(this.cartItems.length===0?o.innerHTML=`
+        `,p.appendChild(h),p.scrollTop=p.scrollHeight}setTimeout(()=>{t.innerHTML=o,t.classList.remove("added"),t.removeAttribute("data-loading")},3500)}catch{t.innerHTML="Error",t.removeAttribute("data-loading"),setTimeout(()=>{t.innerHTML=o,t.style.opacity="1"},2e3)}}updateCartUI(){const t=this.shadowRoot.getElementById("inchatCartStrip"),e=this.shadowRoot.getElementById("cartStripCountText"),i=this.shadowRoot.getElementById("cartStripTotalText"),o=this.shadowRoot.getElementById("drawerCartBadge"),r=this.shadowRoot.getElementById("drawerTotalPrice"),s=this.shadowRoot.getElementById("cartDrawerItems"),a=this.cartItems.reduce((c,d)=>c+(d.quantity||1),0),n=this.cartItems.reduce((c,d)=>c+(d.price||0)*(d.quantity||1),0);t&&(a>0?(t.classList.remove("hidden"),e&&(e.innerHTML=`<strong>${a}</strong> ${a===1?"item":"items"}`),i&&(i.textContent=`• $${n.toFixed(2)}`)):t.classList.add("hidden")),o&&(o.textContent=String(a)),r&&(r.textContent=`$${n.toFixed(2)}`),s&&(this.cartItems.length===0?s.innerHTML=`
           <div class="cart-drawer-empty">
             <div style="font-size:32px; margin-bottom:8px;">🛒</div>
             <p style="font-weight:700; color:var(--text-main); font-size:14px;">Your cart is empty</p>
             <p style="font-size:12px; margin-top:4px;">Add research compounds or Bacteriostatic Water to get started.</p>
           </div>
-        `:o.innerHTML=this.cartItems.map(c=>`
+        `:s.innerHTML=this.cartItems.map(c=>`
           <div class="cart-drawer-item">
             <div class="drawer-item-info">
               <div class="drawer-item-title" title="${this.escapeHtml(c.title)}">${this.escapeHtml(c.title)}</div>
@@ -1481,7 +1683,7 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
               </svg>
             </button>
           </div>
-        `).join(""))}openCartDrawer(){const t=this.shadowRoot.getElementById("cartDrawer");t&&(this.updateCartUI(),t.classList.remove("hidden"))}closeCartDrawer(){const t=this.shadowRoot.getElementById("cartDrawer");t&&t.classList.add("hidden")}async handleRemoveFromCart(t,e){const i=this.cartItems.findIndex(r=>String(r.id)===String(t)||r.title.toLowerCase().includes(e.toLowerCase()));i!==-1&&this.cartItems.splice(i,1),this.updateCartUI(),f.executeCartRemoval(t).catch(()=>{}),fetch(`${this.apiUrl}/api/cart/remove`,{method:"POST",headers:{"Content-Type":"application/json","X-Site-Key":this.siteKey},body:JSON.stringify({siteKey:this.siteKey,conversationId:this.conversationId,productId:t})}).catch(()=>{});const s=this.shadowRoot.getElementById("chatBody");if(s){const r=document.createElement("div");r.className="message-row assistant",r.innerHTML=`
+        `).join(""))}openCartDrawer(){const t=this.shadowRoot.getElementById("cartDrawer");t&&(this.updateCartUI(),t.classList.remove("hidden"))}closeCartDrawer(){const t=this.shadowRoot.getElementById("cartDrawer");t&&t.classList.add("hidden")}async handleRemoveFromCart(t,e){const i=this.cartItems.findIndex(r=>String(r.id)===String(t)||r.title.toLowerCase().includes(e.toLowerCase()));i!==-1&&this.cartItems.splice(i,1),this.updateCartUI(),g.executeCartRemoval(t).catch(()=>{}),fetch(`${this.apiUrl}/api/cart/remove`,{method:"POST",headers:{"Content-Type":"application/json","X-Site-Key":this.siteKey},body:JSON.stringify({siteKey:this.siteKey,conversationId:this.conversationId,productId:t})}).catch(()=>{});const o=this.shadowRoot.getElementById("chatBody");if(o){const r=document.createElement("div");r.className="message-row assistant",r.innerHTML=`
         <div class="message-avatar">${this.getAvatarHtml(34)}</div>
         <div class="message-content-group">
           <div class="message-bubble assistant" style="border-left: 3px solid #dc2626;">
@@ -1489,7 +1691,7 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
           </div>
           <span class="message-timestamp">${this.getTimeString()}</span>
         </div>
-      `,s.appendChild(r),s.scrollTop=s.scrollHeight}}async handleClearAllCart(){this.cartItems=[],this.updateCartUI(),f.clearStoreCart().catch(()=>{}),fetch(`${this.apiUrl}/api/cart/clear`,{method:"POST",headers:{"Content-Type":"application/json","X-Site-Key":this.siteKey},body:JSON.stringify({siteKey:this.siteKey,conversationId:this.conversationId})}).catch(()=>{}),setTimeout(()=>this.closeCartDrawer(),300);const t=this.shadowRoot.getElementById("chatBody");if(t){const e=document.createElement("div");e.className="message-row assistant",e.innerHTML=`
+      `,o.appendChild(r),o.scrollTop=o.scrollHeight}}async handleClearAllCart(){this.cartItems=[],this.updateCartUI(),g.clearStoreCart().catch(()=>{}),fetch(`${this.apiUrl}/api/cart/clear`,{method:"POST",headers:{"Content-Type":"application/json","X-Site-Key":this.siteKey},body:JSON.stringify({siteKey:this.siteKey,conversationId:this.conversationId})}).catch(()=>{}),setTimeout(()=>this.closeCartDrawer(),300);const t=this.shadowRoot.getElementById("chatBody");if(t){const e=document.createElement("div");e.className="message-row assistant",e.innerHTML=`
         <div class="message-avatar">${this.getAvatarHtml(34)}</div>
         <div class="message-content-group">
           <div class="message-bubble assistant" style="border-left: 3px solid #dc2626;">
@@ -1497,6 +1699,16 @@ var B=Object.defineProperty;var A=(x,m,f)=>m in x?B(x,m,{enumerable:!0,configura
           </div>
           <span class="message-timestamp">${this.getTimeString()}</span>
         </div>
-      `,t.appendChild(e),t.scrollTop=t.scrollHeight}}escapeHtml(t){return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}formatMarkdown(t){let e=this.escapeHtml(t);return e=e.replace(/\*\*(.*?)\*\*/g,"<strong>$1</strong>"),e=e.replace(/^[•\-\*]\s+(.*)$/gm,"<li>$1</li>"),e=e.replace(/(<li>.*<\/li>)/s,"<ul>$1</ul>"),e=e.split(`
-
-`).map(i=>`<p>${i.replace(/\n/g,"<br>")}</p>`).join(""),e}}if(typeof window<"u"){const k=new C;window.UniversalChatbot=k,document.readyState==="loading"?document.addEventListener("DOMContentLoaded",()=>k.init()):k.init()}x.UniversalCommerceWidget=C,Object.defineProperty(x,Symbol.toStringTag,{value:"Module"})})(this.UniversalChatbot=this.UniversalChatbot||{});
+      `,t.appendChild(e),t.scrollTop=t.scrollHeight}}escapeHtml(t){return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}formatMarkdown(t){if(!t)return"";let e=this.escapeHtml(t);return e=e.replace(/\*\*(.*?)\*\*/g,"<strong>$1</strong>"),e=e.replace(/💵\s*(?:<strong>)?(?:Estimated\s*Subtotal|Updated\s*Total)(?:<\/strong>)?:\s*(?:<strong>)?(\$[\d,.]+(?:\.\d{2})?)(?:<\/strong>)?/gi,(o,r)=>`<div class="subtotal-highlight-badge"><span class="subtotal-icon">💵</span><span class="subtotal-text">Estimated Subtotal: <strong>${r}</strong></span></div>`),e=e.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g,(o,r,s)=>{const a=s.trim(),n=r.trim(),c=a.toLowerCase(),d=n.toLowerCase();return c.includes("checkout")||d.includes("checkout")?`<a href="${a}" target="_blank" rel="noopener noreferrer" class="chat-action-btn chat-checkout-btn">
+          <span class="btn-icon">💳</span>
+          <span class="btn-text">${n}</span>
+          <span class="btn-arrow">➔</span>
+        </a>`:c.includes("cart")||d.includes("cart")||d.includes("basket")?`<a href="${a}" target="_blank" rel="noopener noreferrer" class="chat-action-btn chat-cart-btn">
+          <span class="btn-icon">🛒</span>
+          <span class="btn-text">${n}</span>
+          <span class="btn-arrow">➔</span>
+        </a>`:c.includes("order")||c.includes("track")||d.includes("order")||d.includes("track")?`<a href="${a}" target="_blank" rel="noopener noreferrer" class="chat-action-btn chat-track-btn">
+          <span class="btn-icon">📦</span>
+          <span class="btn-text">${n}</span>
+          <span class="btn-arrow">➔</span>
+        </a>`:`<a href="${a}" target="_blank" rel="noopener noreferrer" class="chat-inline-link">${n} <span class="ext-icon">↗</span></a>`}),e=e.replace(new RegExp(`(?<!href=["'])(https?:\\/\\/[a-zA-Z0-9_\\-\\.\\/]+(?:\\?[a-zA-Z0-9_\\-=&%]+)?)`,"g"),o=>`<a href="${o}" target="_blank" rel="noopener noreferrer" class="chat-inline-link">${o} <span class="ext-icon">↗</span></a>`),e=e.replace(/^[•\-\*]\s+(.*)$/gm,"<li>$1</li>"),e=e.replace(/((?:<li>.*<\/li>\s*)+)/g,"<ul>$1</ul>"),e=e.split(/\n\s*\n/).map(o=>{const r=o.trim();return r?r.startsWith("<div")||r.startsWith("<ul")||r.startsWith("<a")?r:`<p>${r.replace(/\n/g,"<br>")}</p>`:""}).filter(Boolean).join(""),e}}if(typeof window<"u"){const k=new C;window.UniversalChatbot=k,document.readyState==="loading"?document.addEventListener("DOMContentLoaded",()=>k.init()):k.init()}x.UniversalCommerceWidget=C,Object.defineProperty(x,Symbol.toStringTag,{value:"Module"})})(this.UniversalChatbot=this.UniversalChatbot||{});

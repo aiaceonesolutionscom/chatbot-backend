@@ -243,7 +243,7 @@ class UniversalAICommerceChatbot {
                 apiUrl: '<?php echo esc_js($api_url); ?>',
                 nonce: '<?php echo esc_js($nonce); ?>',
                 storeOrigin: '<?php echo esc_js(get_site_url()); ?>',
-                logoUrl: '<?php echo esc_url(plugins_url('assets/assistance.gif', __FILE__)); ?>'
+                logoUrl: 'https://colbolt.hawksnfox.com/wp-content/uploads/2021/05/colbol.png'
             };
         </script>
         <script 

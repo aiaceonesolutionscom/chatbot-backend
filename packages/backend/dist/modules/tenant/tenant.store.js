@@ -25,9 +25,9 @@ export class TenantStore {
                 brand: {
                     companyName: 'Colbolt',
                     assistantName: 'COLBOLT.',
-                    logoUrl: 'https://colbolt.hawksnfox.com/wp-content/uploads/2024/10/7.jpg',
-                    primaryColor: '#16408a',
-                    secondaryColor: '#248acc',
+                    logoUrl: 'https://colbolt.hawksnfox.com/wp-content/uploads/2021/05/colbol.png',
+                    primaryColor: '#0d2958',
+                    secondaryColor: '#0284c7',
                     fontFamily: "'Jost', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
                     launcherPosition: 'bottom-right',
                     welcomeMessage: 'Hello! Welcome to Colbolt. I can help you find products (like Bacteriostatic Water, Tirz, Retatrutide), check prices within your budget, or add items directly to your cart. How can I help you today?',
