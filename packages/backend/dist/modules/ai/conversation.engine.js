@@ -62,12 +62,20 @@ export class ConversationEngine {
      * Resolves exact product and dosage from customer message with 100% precision.
      * Prevents matching "Tirz 60mg" when user asked for "Tirz 10mg", etc.
      */
-    static resolveProductFromMessage(msg, storeProducts) {
-        const msgLower = msg.toLowerCase();
+    static resolveProductFromMessage(msg, storeProducts, contextProduct) {
+        const msgLower = (msg || '').toLowerCase();
         // 1. Extract dosage: e.g. "60mg", "60 mg", "60m", "30mg", "30 mg", "10mg", "10 mg", "10m", "5mg", "5 mg"
-        const dosageMatches = [...msgLower.matchAll(/\b(\d+)\s*(?:mg|m)\b/gi)];
-        // In update/swap sentences (e.g. "tirz 10 mg update kardo 60 mg akrdoo"), the desired new product is the last dosage!
-        const isSwap = /\b(update|badal|change|swap|replace|to)\b/i.test(msgLower);
+        let dosageMatches = [...msgLower.matchAll(/\b(\d+)\s*(?:mg|m)\b/gi)];
+        // If no explicit 'mg' found, but sentence contains known catalog strengths (60, 30, 10, 5)
+        if (dosageMatches.length === 0) {
+            const numMatches = [...msgLower.matchAll(/\b(60|30|10|5)\b/gi)];
+            if (numMatches.length > 0) {
+                dosageMatches = numMatches;
+            }
+        }
+        // In update/swap sentences (e.g. "tirz 10 mg update kardo 60 mg akrdoo", "60 nahi 10 karna tha"),
+        // the desired target product is the last dosage mentioned!
+        const isSwap = /\b(update|badal|change|swap|replace|to|nahi|not|mat)\b/i.test(msgLower);
         const chosenDosageMatch = (isSwap && dosageMatches.length > 1)
             ? dosageMatches[dosageMatches.length - 1]
             : (dosageMatches.length > 0 ? dosageMatches[0] : null);
@@ -82,6 +90,17 @@ export class ConversationEngine {
             compound = 'reta';
         else if (/\bwater\b/i.test(msgLower) || /\bbacteriostatic\b/i.test(msgLower))
             compound = 'water';
+        else if (contextProduct) {
+            const ctxTitle = contextProduct.title.toLowerCase();
+            if (ctxTitle.includes('tirz'))
+                compound = 'tirz';
+            else if (ctxTitle.includes('sema'))
+                compound = 'sema';
+            else if (ctxTitle.includes('reta'))
+                compound = 'reta';
+            else if (ctxTitle.includes('water'))
+                compound = 'water';
+        }
         // 3. Precision matching: compound + dosage
         if (compound && dosage) {
             const match = storeProducts.find(p => {
@@ -97,23 +116,140 @@ export class ConversationEngine {
             if (matchDose)
                 return matchDose;
         }
-        // 5. If only compound is specified
-        if (compound === 'water') {
-            return storeProducts.find(p => p.title.toLowerCase().includes('water'));
-        }
-        else if (compound === 'reta') {
-            return storeProducts.find(p => p.title.toLowerCase().includes('reta'));
-        }
-        else if (compound === 'tirz') {
-            return storeProducts.find(p => p.title.includes('10mg') && p.title.toLowerCase().includes('tirz')) ||
-                storeProducts.find(p => p.title.toLowerCase().includes('tirz'));
-        }
-        else if (compound === 'sema') {
-            return storeProducts.find(p => p.title.includes('5mg') && p.title.toLowerCase().includes('sema')) ||
-                storeProducts.find(p => p.title.toLowerCase().includes('sema'));
+        // 5. If compound is explicitly specified in the message
+        const compoundExplicitInMsg = /\b(tirz|sema|reta|water|bacteriostatic)\b/i.test(msgLower);
+        if (compoundExplicitInMsg) {
+            if (compound === 'water') {
+                return storeProducts.find(p => p.title.toLowerCase().includes('water'));
+            }
+            else if (compound === 'reta') {
+                return storeProducts.find(p => p.title.toLowerCase().includes('reta'));
+            }
+            else if (compound === 'tirz') {
+                return storeProducts.find(p => p.title.includes('10mg') && p.title.toLowerCase().includes('tirz')) ||
+                    storeProducts.find(p => p.title.toLowerCase().includes('tirz'));
+            }
+            else if (compound === 'sema') {
+                return storeProducts.find(p => p.title.includes('5mg') && p.title.toLowerCase().includes('sema')) ||
+                    storeProducts.find(p => p.title.toLowerCase().includes('sema'));
+            }
         }
         // 6. Direct title substring
         return storeProducts.find(p => msgLower.includes(p.title.toLowerCase()));
+    }
+    /**
+     * Universal Semantic Intent Extractor
+     * Understands customer desires across Urdu, Roman Urdu, English, colloquial slang, and typos.
+     * Completely independent of rigid single keywords.
+     */
+    static extractCustomerIntent(msg, storeProducts, sessionItems, lastProduct) {
+        const msgLower = (msg || '').toLowerCase().trim();
+        // 1. Strip dosages to safely detect quantity without confusing "10mg" with 10 items
+        const cleanForQty = msgLower.replace(/\b\d+\s*(?:mg|m)\b/gi, '').trim();
+        const qtyMatch = cleanForQty.match(/\b([1-9]|10)\s*(x|pieces?|vials?|bottles?|dabbay?|pcs?)?\b/i);
+        const parsedQty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
+        // 2. Resolve target product with dosage precision
+        const ctxItem = sessionItems.length > 0 ? sessionItems[sessionItems.length - 1] : lastProduct;
+        const targetProduct = ConversationEngine.resolveProductFromMessage(msgLower, storeProducts, ctxItem);
+        // Candidate for adding
+        const lastCartProd = sessionItems.length > 0 ? storeProducts.find(p => p.id === sessionItems[sessionItems.length - 1].id) : undefined;
+        const productCandidate = targetProduct || lastProduct || lastCartProd;
+        // 1. CHECKOUT INTENT
+        const isCheckout = /\b(proc[ce]+d|check\s*out|checkout|pay|payment|pese|bill\s*bana|order\s*finalize|order\s*place|buy\s*now|khareedna|kharidna|ab\s*lene|order\s*confirm)\b/i.test(msgLower) &&
+            !/\b(policy|refund|shipping|terms|about)\b/i.test(msgLower);
+        if (isCheckout) {
+            return { action: 'CHECKOUT', quantity: 1 };
+        }
+        // 2. CLEAR CART INTENT
+        const isClear = /\b(khali|empty\s*cart|clear\s*cart|sab\s*(hata|nikal|delete)|kuch\s*nahi\s*(chahiye|lena)|po?ora\s*cart\s*(hata|saaf|khali))\b/i.test(msgLower);
+        if (isClear) {
+            return { action: 'CLEAR_CART', quantity: 0 };
+        }
+        // 3. ORDER CANCEL INTENT
+        const isCancel = /\b(cancel|rok\s*do|band\s*karo)\b.*\b(order|#\d+)\b/i.test(msgLower);
+        if (isCancel) {
+            return { action: 'CANCEL_ORDER', quantity: 0 };
+        }
+        // 4. ORDER TRACKING INTENT
+        const isTrack = (/#\d{3,7}\b/.test(msgLower) && !/\bcancel\b/i.test(msgLower)) ||
+            /\b(track(ing)?|kahan hai|kahan tak|kab aayega|pohanch|dispatch status)\b.*\b(order|parcel|package|shipment)?\b/i.test(msgLower);
+        if (isTrack) {
+            return { action: 'TRACK_ORDER', quantity: 0 };
+        }
+        // 5. DECREASE / MINUS QUANTITY INTENT (Must be before SWAP and VIEW_CART)
+        // Matches: "1 minus akrdoo", "1 kam akrdooo", "remove akrdo ik quantity", "aik kam kar do", "aik nikaal lo", "bas aik rehne do"
+        const isDecreaseIntent = /\b(minus|ghata|ghatao|ghatana|reduce|decrease|less|drop\s*1|sub|subtract)\b/i.test(msgLower) ||
+            /kam\s*(kard|akrd|kar|kr|rakh)[oe\s]*/i.test(msgLower) ||
+            /\b(aik|ek|1|one)\s*(kam|hata|nikaal|nikal|minus|drop|off|ghata)\b/i.test(msgLower) ||
+            /\b(nikaal|nikal|hata)\b.*\b(aik|ek|1|one|quantity|qty)\b/i.test(msgLower) ||
+            /\b(bas|sirf|only)\s*(aik|ek|1|one)\s*(rehne|rakh|bacha)\b/i.test(msgLower) ||
+            /\b(remove|delete)\b.*\b(quantity|qty|ik|1|ek|one)\b/i.test(msgLower) ||
+            /\b(remove|delete)\s+(1|ik|ek|one)\b/i.test(msgLower) ||
+            /\bzyada\s*ho\s*gaya\b/i.test(msgLower);
+        if (isDecreaseIntent && sessionItems.length > 0) {
+            return { action: 'DECREASE_QTY', quantity: parsedQty || 1 };
+        }
+        // 6. SET / INCREASE QUANTITY INTENT (Must be before SWAP)
+        // Matches: "quantity 3 kardo iskii", "likn quantity 1 rakhoo", "tirz ki quantity 2 kar do", "3 bottles kardo", "do kar do", "barha do quantity"
+        const isExplicitQtyWord = /\b(quantity|qty|miqdaar|taadad)\b/i.test(msgLower);
+        const isIncreaseWord = /\b(barha|barhao|barhana|increase|plus|double|triple|ek\s*aur|aik\s*aur|one\s*more|add\s*more)\b/i.test(msgLower);
+        const isSetWord = /\b(rakho|rakhoo|kardo|kar\s*do|karna|set|make|update)\b/i.test(msgLower);
+        const isSwapComparison = /\b(\d+)\s*(?:nahi|not|mat)\s*(\d+)/i.test(msgLower);
+        const isQuantityIntent = !isSwapComparison && ((isExplicitQtyWord && (qtyMatch || isIncreaseWord || isSetWord)) ||
+            (isIncreaseWord && (sessionItems.length > 0 || targetProduct || /\b(product|item|yeh|ye|woh|wo)\b/i.test(msgLower))) ||
+            (qtyMatch && isSetWord && /\b(quantity|qty|rakh|kard)\b/i.test(msgLower)) ||
+            /\b(\d+)\s*(kardo|kar\s*do|rakho|rakhoo|karna|rakhna|banao|vials?|bottles?|dabbay?|pcs?|pieces?)\b/i.test(msgLower));
+        if (isQuantityIntent && sessionItems.length > 0) {
+            return { action: 'SET_QTY', targetProduct, quantity: parsedQty };
+        }
+        // 7. SWAP / REPLACE COMPOUND INTENT
+        // Matches: "tirz 60 mg update kardo 10 mg akrdoo", "60 nahi 10 chahiye", "60 nahi 10 karna tha", "galti se 60 agya 10 karna tha", "60 ki jagah 10 kardo"
+        const isRejectPhrase = /\b(mat\s*lena|nahi\s*chahiye|mat\s*dalo|rehne\s*do|nahi\s*lena)\b/i.test(msgLower);
+        const isExplicitSwapWord = !isRejectPhrase && (/\b(update|badal|badlo|change|swap|replace|switch|hata\s*ke|ki\s*jagah|ke\s*badle|ke\s*bajaye|instead\s*of|galti\s*se|galat|wrong)\b/i.test(msgLower) ||
+            /\b(\d+)\s*(?:nahi|not|mat)\s*(\d+)/i.test(msgLower) ||
+            /\b(nahi|not)\b.*\b(balkay|chahiye|dalo|rakho|bhejo)\b/i.test(msgLower));
+        const allDosages = [...msgLower.matchAll(/\b(\d+)\s*(?:mg|m)\b/gi)];
+        if (sessionItems.length > 0 && !isExplicitQtyWord && !isRejectPhrase) {
+            if (isExplicitSwapWord || (targetProduct && allDosages.length > 1)) {
+                const existingDiffItem = targetProduct ? sessionItems.find(it => it.id !== targetProduct.id) : sessionItems[0];
+                return {
+                    action: 'SWAP',
+                    targetProduct,
+                    oldProduct: existingDiffItem,
+                    quantity: parsedQty
+                };
+            }
+        }
+        // 8. REMOVE / DELETE INTENT
+        // Matches: "tirz 60m remove karddoo", "tirz hata doo", "water mat lena", "ye nahi chahiye", "chhor do isay"
+        const isRemoveWord = /\b(remove|delete|uncart|un-cart|hata|hatao|nikaal|nikal|nikalo|drop|discard|chhor|chhoro|chhod|chhod\s*do)\b/i.test(msgLower);
+        const isRemoveIntent = (isRemoveWord && (sessionItems.length > 0 || targetProduct || /\b(cart|basket|tokri|yeh|ye|woh|wo|it|product|item)\b/i.test(msgLower))) ||
+            isRejectPhrase ||
+            /\bcart\s*se\s*(hata|nikaal|nikal|chhor|bahar)\b/i.test(msgLower);
+        if (isRemoveIntent && sessionItems.length > 0) {
+            return { action: 'REMOVE', targetProduct, quantity: 1 };
+        }
+        // 9. ADD TO CART INTENT (MUST NOT be triggered as VIEW_CART)
+        // Matches: "tirz 10 mg add akroo cart mai", "1 or add akrdoo", "bacteriostatic water add kardo", "ye dalo basket mai"
+        const isAddWord = /\b(add|dalo|daal|daalo|shamil|pack|bhej\s*do|bhejo|de\s*do|dedo|lena\s*hai|khareedna|kharidna|mangwana|order\s*karo|basket\s*mai|khud\s*akrdo|a[fd]+|1\s*or|ek\s*aur|aik\s*aur)\b/i.test(msgLower);
+        const isDesirePhrase = /\b(chahiye|mujhay\s*chahiye|yehi\s*chahiye|yehi\s*dedo|yehi\s*bhej\s*do|lena\s*chahta)\b/i.test(msgLower);
+        const isBudgetAsk = /\b(budget|\$|dollar|sasta|chhota|kam price|under)\b/i.test(msgLower);
+        const hasAddVerb = (isAddWord || /\bakrdoo?\b/i.test(msgLower) || /\bkardo\b/i.test(msgLower)) && !isBudgetAsk;
+        const isAddIntent = ((isAddWord && (!!productCandidate || /\b(cart|basket|it|yeh|ye|woh|wo)\b/i.test(msgLower))) ||
+            (isDesirePhrase && !!productCandidate && !/\b(policy|shipping|info|kya|kia|price|qeemat)\b/i.test(msgLower)) ||
+            (!!targetProduct && /\b(akrdoo|kardo|kar\s*do|bhejo|dalo|lena)\b/i.test(msgLower))) && !isBudgetAsk;
+        if (isAddIntent && productCandidate) {
+            return { action: 'ADD', targetProduct: productCandidate, quantity: parsedQty };
+        }
+        // 10. VIEW CART INTENT (Strictly only when viewing, NOT when adding!)
+        // Matches: "mere cart mai kya hai", "cart dikhao", "hua nhin likn cart mai kam", "show my cart"
+        const isViewCart = !isAddWord && (/\b(mere\s*cart|my\s*cart|view\s*cart|show\s*cart|cart\s*dikhao|cart\s*check|cart\s*dekh|kitnay\s*product|kon\s*kon\s*sa\b.*\bproduct)\b/i.test(msgLower) ||
+            /\bcart\s*mai\s*(kya|kitnay|konsa|kam|hua|hai|check|status)\b/i.test(msgLower) ||
+            /\b(show|view|check|open)\s*(my\s*)?(cart|basket)\b/i.test(msgLower));
+        if (isViewCart) {
+            return { action: 'VIEW_CART', quantity: 0 };
+        }
+        return { action: 'NONE', quantity: 1 };
     }
     /**
      * Anti-Troll & Anti-Time-Waster State Tracker
@@ -129,13 +265,13 @@ export class ConversationEngine {
      * Check if a message contains serious business, product, or store inquiry intent.
      */
     static isBusinessIntent(msgLower) {
-        return /\b(semaglutide|tirz|tirzepatide|retatrutide|bacteriostatic|water|peptides?|compounds?|diluents?|dose|dosage|mg|vials?|prices?|pricing|costs?|rates?|stocks?|available|in stock|buy|orders?|cart|checkout|purchase|add to cart|catalog|all products?|products?|items?|shipping|delivery|dispatch|track|tracking|policies?|policy|about|company|colbolt|website|store|budget|dollars?|\$|usd|bacs|payments?|banks?|refunds?|returns?|discreet|purity|lab|research|coas?|contact|emails?|support|help|chahiye|khareedna|mangwana|kitnay|kitna|qeemat|batao|dikhao|paas|available hai|deliver)\b/i.test(msgLower);
+        return /\b(semaglutide|tirz|tirzepatide|retatrutide|bacteriostatic|water|peptides?|compounds?|diluents?|dose|dosage|mg|vials?|prices?|pricing|costs?|rates?|stocks?|available|in stock|buy|orders?|cart|checkout|purchase|add to cart|catalog|all products?|products?|items?|shipping|delivery|dispatch|track|tracking|policies?|policy|about|company|colbolt|cobolt|colt|website|store|budget|dollars?|\$|usd|bacs|payments?|banks?|refunds?|returns?|discreet|purity|lab|research|coas?|contact|emails?|support|help|chahiye|khareedna|mangwana|kitnay|kitna|qeemat|batao|dikhao|paas|available hai|deliver|kaam kis|kia karta|kya karta|kaam kya|kya kaam|kis tareeqay|karta kia|karta kya)\b/i.test(msgLower);
     }
     /**
      * Check if a message is a casual pleasantry, greeting, or meaningless chatter.
      */
     static isChitChat(msgLower) {
-        return /^(kese hoo?|kaise ho|kaisay ho|ap kaise ho|aap kaise hain|kya haal hai|kya haal|theek ho|theek hain|aur sunao|aur batao|kya chal raha hai|kya kar rahe ho|kon ho|tum kon ho|naam kya hai|hello|hi|hey|heyy|heya|salam|asalam|assalam|aoa|good morning|good evening|how are you|who are you|ok|okay|theek|thik|acha|achha|hmm|hmmm|haan|bye|tata|alvida)[\s!.,?]*$/i.test(msgLower) ||
+        return /^(kese hoo?|kaise ho|kaisay ho|ap kaise ho|aap kaise hain|kya haal hai|kya haal|theek ho|theek hain|aur sunao|aur batao|kya chal raha hai|kya kar rahe ho|kon ho|tum kon ho|naam kya hai|hello|hi|hey|heyy|heya|salam|asalam|assalam|aoa|good morning|good evening|how are you|who are you|ok|okay|theek|thik|acha|achha|hmm|hmmm|haan)[\s!.,?]*$/i.test(msgLower) ||
             /^(what's up|whats up|sup|yo|wassup|tell me a joke|are you real|are you human|are you ai|are you bot|tum bot ho|pagal|love you)[\s!.,?]*$/i.test(msgLower);
     }
     /**
@@ -147,6 +283,26 @@ export class ConversationEngine {
         const { conversationId, message, tenant } = input;
         const trimmedMessage = (message || '').trim();
         const msgLower = trimmedMessage.toLowerCase();
+        const isUrduLangInitial = /(kya|hai|hain|karo|karein|mujhay|mujh|batao|bataen|aap|tum|kaise|kaisay|chahiye|ye|yeh|wo|woh|nhi|nahi|nhin|se|hata|nikaal|nikal|rok|mera|mere)/i.test(msgLower);
+        // 0A. WARM FAREWELL & GOODBYE HANDLER
+        const isFarewell = /^\s*(bye+|goodbye|good\s*bye|alvida|allah\s*hafiz|khuda\s*hafiz|tata|see\s*you|take\s*care|cya)[\s!.,?]*$/i.test(msgLower) ||
+            /\b(bye+|goodbye|allah\s*hafiz|khuda\s*hafiz)\b/i.test(msgLower);
+        if (isFarewell) {
+            const farewellMsg = isUrduLangInitial
+                ? "Allah Hafiz! Colbolt par aane ka bohot shukriya. Agar aapko research compounds ya order ke hawale se kabhi bhi madad chahiye ho, hum hamesha dastyab hain. Have a wonderful day! 😊"
+                : "Goodbye! Thank you for visiting Colbolt. If you ever need assistance with our research compounds or orders, we are always here to help. Have a wonderful day! 😊";
+            this.recordTurn(conversationId, trimmedMessage, farewellMsg);
+            return {
+                conversationId,
+                role: 'assistant',
+                message: farewellMsg,
+                productCards: undefined,
+                quickReplies: [
+                    { label: 'View All Products', actionText: 'Show all products' },
+                    { label: 'Shipping Info', actionText: 'What is your shipping policy?' }
+                ]
+            };
+        }
         // 0. ANTI-TROLL & ANTI-TIME-WASTER DETECTION
         const hasBusiness = this.isBusinessIntent(msgLower);
         const isCasual = this.isChitChat(msgLower);
@@ -258,19 +414,20 @@ export class ConversationEngine {
         if (matchedStoreProduct) {
             ConversationEngine.sessionLastProduct.set(conversationId, matchedStoreProduct);
         }
-        // 2. Quantity string cleanup: Strip out dosages like "10mg", "10 mg", "60mg", "60m"
-        // so dosage is NEVER confused with requested item quantity!
+        const currentSessionItems = ConversationEngine.getSessionCart(conversationId);
+        const lastSessionProduct = ConversationEngine.sessionLastProduct.get(conversationId);
+        // 2. EXTRACT SEMANTIC CUSTOMER INTENT (Completely independent of rigid keywords)
+        const semanticIntent = ConversationEngine.extractCustomerIntent(trimmedMessage, storeProducts, currentSessionItems, lastSessionProduct);
         const cleanForQty = msgLower.replace(/\b\d+\s*(?:mg|m)\b/gi, '').trim();
         const qtyMatch = cleanForQty.match(/\b([1-9]|10)\s*(x|pieces?|vials?|bottles?)?\b/i);
-        const parsedQty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
+        const parsedQty = semanticIntent.quantity || (qtyMatch ? parseInt(qtyMatch[1], 10) : 1);
         // 2A0. SWAP / REPLACE COMPOUND HANDLER
-        // Matches: "tirz 60 mg update kardo 10 mg akrdoo", "tirz 60 ko 10mg kardo", "60 hata ke 10 kardo", "change to 10mg"
-        const isSwapKeyword = /\b(update|badal|change|swap|replace|hata\s*ke)\b/i.test(msgLower);
-        const currentSessionItems = ConversationEngine.getSessionCart(conversationId);
-        const isSwapIntent = (isSwapKeyword && matchedStoreProduct && currentSessionItems.some(it => it.id !== matchedStoreProduct.id)) ||
-            (matchedStoreProduct && /\b(update|badal)\b/i.test(msgLower) && currentSessionItems.length > 0 && currentSessionItems.some(it => it.id !== matchedStoreProduct.id));
-        if (isSwapIntent && matchedStoreProduct) {
-            const oldItem = currentSessionItems.find(it => it.id !== matchedStoreProduct.id) || currentSessionItems[0];
+        // Matches ANY natural phrasing of swap/replace:
+        // "tirz 60 mg update kardo 10 mg akrdoo", "60 nahi 10 chahiye", "galti se 60 agya 10 karna tha", "60 ki jagah 10 kardo", "10mg wala bhej do 60 hata do"
+        const isSwapIntent = semanticIntent.action === 'SWAP' && !!semanticIntent.targetProduct;
+        if (isSwapIntent && semanticIntent.targetProduct) {
+            const targetProd = semanticIntent.targetProduct;
+            const oldItem = semanticIntent.oldProduct || currentSessionItems.find(it => it.id !== targetProd.id) || currentSessionItems[0];
             if (oldItem) {
                 ConversationEngine.removeFromSessionCart(conversationId, oldItem.id);
                 ConversationEngine.removeFromSessionCart(conversationId, oldItem.title);
@@ -279,24 +436,24 @@ export class ConversationEngine {
                 }
             }
             const newCartItem = {
-                id: matchedStoreProduct.id,
-                title: matchedStoreProduct.title,
-                price: matchedStoreProduct.price.regular,
+                id: targetProd.id,
+                title: targetProd.title,
+                price: targetProd.price.regular,
                 quantity: parsedQty
             };
             ConversationEngine.addToSessionCart(conversationId, newCartItem);
             if (adapter.addToCart) {
-                adapter.addToCart(matchedStoreProduct.id, undefined, parsedQty, { shopperSessionId: input.shopperSessionId }).catch(() => { });
+                adapter.addToCart(targetProd.id, undefined, parsedQty, { shopperSessionId: input.shopperSessionId }).catch(() => { });
             }
             const updatedCart = ConversationEngine.getSessionCart(conversationId);
             const subtotal = updatedCart.reduce((acc, it) => acc + (it.price * it.quantity), 0);
             const msg = isUrduLang
                 ? `✅ **${oldItem ? oldItem.title : 'Previous item'}** cart se remove kar diya gaya hai!\n\n` +
-                    `✅ **${matchedStoreProduct.title}** (${parsedQty}x) kamyabi se cart mein **ADD** kar diya gaya hai!\n\n` +
+                    `✅ **${targetProd.title}** (${parsedQty}x) kamyabi se cart mein **ADD** kar diya gaya hai!\n\n` +
                     `💵 **Updated Total**: $${subtotal.toFixed(2)}\n\n` +
                     `🔗 [View Full Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)`
                 : `✅ **${oldItem ? oldItem.title : 'Previous item'}** has been removed from your cart!\n\n` +
-                    `✅ **${matchedStoreProduct.title}** (${parsedQty}x) has been successfully ADDED to your cart!\n\n` +
+                    `✅ **${targetProd.title}** (${parsedQty}x) has been successfully ADDED to your cart!\n\n` +
                     `💵 **Updated Total**: $${subtotal.toFixed(2)}\n\n` +
                     `🔗 [View Full Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)`;
             const response = {
@@ -307,9 +464,9 @@ export class ConversationEngine {
                 cartAction: {
                     type: 'add',
                     item: {
-                        id: matchedStoreProduct.id,
-                        title: matchedStoreProduct.title,
-                        price: matchedStoreProduct.price.regular,
+                        id: targetProd.id,
+                        title: targetProd.title,
+                        price: targetProd.price.regular,
                         quantity: parsedQty
                     }
                 },
@@ -322,11 +479,29 @@ export class ConversationEngine {
             this.recordTurn(conversationId, trimmedMessage, msg);
             return response;
         }
+        // 2A0B. UNDERSPECIFIED SWAP CLARIFICATION (HUMAN-LIKE ASKING)
+        if (semanticIntent.action === 'SWAP' && !semanticIntent.targetProduct) {
+            const askMsg = isUrduLang
+                ? "Aap is item ko kis doosre compound ya strength (jaise **10mg**, **30mg**, ya **60mg**) ke sath replace karna chahte hain? Baraye meherbani matlooba product ya strength batayein:"
+                : "Which compound or strength (e.g., **10mg**, **30mg**, or **60mg**) would you like to switch to? Please let me know the desired product or strength:";
+            const response = {
+                conversationId,
+                role: 'assistant',
+                message: askMsg,
+                productCards: storeProducts,
+                quickReplies: [
+                    { label: 'Tirz 10mg', actionText: 'tirz 10mg kardo' },
+                    { label: 'Tirz 60mg', actionText: 'tirz 60mg kardo' },
+                    { label: 'Show All Products', actionText: 'Show all products' }
+                ]
+            };
+            this.recordTurn(conversationId, trimmedMessage, askMsg);
+            return response;
+        }
         // 2A1. DECREASE / REDUCE / MINUS QUANTITY HANDLER
-        // Matches: "1 minus akrdoo", "remove akrdo ik quantity", "minus", "1 minus", "kam karo", "kam kardo", "ghata do", "reduce quantity"
-        const isDecreaseIntent = /\b(minus|kam karo|kam kardo|ghatao|ghata do|reduce|decrease|1\s*minus|ek\s*minus|ik\s*minus)\b/i.test(msgLower) ||
-            /\b(remove|delete)\b.*\b(quantity|qty|ik|1|ek|one)\b/i.test(msgLower) ||
-            /\b(remove|delete)\s+(1|ik|ek|one)\b/i.test(msgLower);
+        // Matches ANY natural phrasing of minus/decrease:
+        // "1 minus akrdoo", "remove akrdo ik quantity", "aik kam kar do", "aik nikaal lo", "bas aik rehne do", "zyada ho gaya aik hata do", "ghata do"
+        const isDecreaseIntent = semanticIntent.action === 'DECREASE_QTY';
         if (isDecreaseIntent) {
             const sessionItems = ConversationEngine.getSessionCart(conversationId);
             if (sessionItems.length > 0) {
@@ -412,19 +587,21 @@ export class ConversationEngine {
             }
         }
         // 2A. UN-CART / REMOVE FROM CART HANDLER
-        // Matches: "tirz 60m remove karddoo", "tirz hata doo", "remove tirz", "water nikal do", "delete tirz", "cart se tirz hata do", "hata do"
-        const removeKeywords = /\b(remove|delete|uncart|un-cart|hata|hatao|nikaal|nikal|nikalo|drop)\b/i;
-        const isCartWord = /\b(cart|shopping cart|basket|tokri)\b/i.test(msgLower);
-        const isExplicitUncart = (isCartWord && removeKeywords.test(msgLower)) ||
-            (removeKeywords.test(msgLower) && (!!matchedStoreProduct || /\b(tirz|sema|semaglutide|water|retatrutide|item|product|yeh|ye|woh|wo|it)\b/i.test(msgLower))) ||
-            /\bcart\s*se\b/i.test(msgLower);
+        // Matches ANY natural phrasing of delete/remove/drop:
+        // "tirz 60m remove karddoo", "tirz hata doo", "isko mat lena", "ye nahi chahiye", "ye nikal do basket se", "chhor do isay", "drop this"
+        const isExplicitUncart = semanticIntent.action === 'REMOVE';
         if (isExplicitUncart) {
             const sessionItems = ConversationEngine.getSessionCart(conversationId);
-            let targetItem = sessionItems.find(it => {
-                const titleLower = it.title.toLowerCase();
-                const firstWord = titleLower.split(/\s+/)[0];
-                return msgLower.includes(titleLower) || msgLower.includes(firstWord);
-            });
+            let targetItem = semanticIntent.targetProduct
+                ? sessionItems.find(it => it.id === semanticIntent.targetProduct.id)
+                : undefined;
+            if (!targetItem) {
+                targetItem = sessionItems.find(it => {
+                    const titleLower = it.title.toLowerCase();
+                    const firstWord = titleLower.split(/\s+/)[0];
+                    return msgLower.includes(titleLower) || msgLower.includes(firstWord);
+                });
+            }
             // Match dosage if present in message (e.g. 60mg, 60m, 10mg)
             const dosageMatch = msgLower.match(/\b(\d+)\s*(?:mg|m)\b/i);
             if (dosageMatch) {
@@ -491,13 +668,9 @@ export class ConversationEngine {
             return response;
         }
         // 2A2. SET QUANTITY / INCREASE QUANTITY HANDLER
-        // Matches: "quantity 3 kardo iskii", "likn quantity 1 rakhoo", "quantity 2 kar do", "barha do", "double karo"
-        const isQtyKeyword = /\b(quantity|qty|miqdaar|taadad|pieces?|vials?)\b/i.test(msgLower);
-        const isIncreaseWord = /\b(barha|barhao|barhani|increase|double|zyada|ek aur|add more|plus)\b/i.test(msgLower);
-        const isSetWord = /\b(rakho|rakhoo|kardo|kar do|karna|set|make|update)\b/i.test(msgLower);
-        const isQuantityIntent = (isQtyKeyword && (qtyMatch || isIncreaseWord || isSetWord)) ||
-            (isIncreaseWord && (isCartWord || matchedStoreProduct || /\b(product|item|yeh|ye|woh|wo)\b/i.test(msgLower))) ||
-            (qtyMatch && isSetWord && /\b(quantity|qty|rakh|kard)\b/i.test(msgLower));
+        // Matches ANY natural phrasing of quantity set/increase:
+        // "quantity 3 kardo iskii", "likn quantity 1 rakhoo", "3 bottles kardo", "do kar do", "barha do quantity", "double kar do"
+        const isQuantityIntent = semanticIntent.action === 'SET_QTY';
         if (isQuantityIntent) {
             const sessionItems = ConversationEngine.getSessionCart(conversationId);
             let targetItem = sessionItems.find(it => {
@@ -553,15 +726,9 @@ export class ConversationEngine {
                 return response;
             }
         }
-        // 2A3. ADD TO CART VIA TEXT HANDLER (WITH CONTEXTUAL "khud add kardo", "afd akrdoo", "tirz 10 mg akrdoo")
-        // Matches: "tirz 10 mg add akroo cart mai", "tirz 10 mg akrdoo", "khud akrdo add", "afd akrdoo", "bacteriostatic water add kardo"
-        const addKeywords = /\b(add|daal|daalo|shamil|order karo|buy|khareedo|khareedna|mangwa do|khud.*add|a[fd]+)\b/i;
-        const isBudgetAsk = /\b(budget|\$|dollar|sasta|chhota|kam price|under)\b/i.test(msgLower);
-        const hasAddVerb = (addKeywords.test(msgLower) || /\bakrdoo?\b/i.test(msgLower) || /\bkardo\b/i.test(msgLower)) && !isBudgetAsk;
-        // Resolve product: directly from message, or contextual last discussed product
-        const productToAdd = matchedStoreProduct || (hasAddVerb ? ConversationEngine.sessionLastProduct.get(conversationId) : undefined);
-        const isExplicitAddIntent = (hasAddVerb && !!productToAdd) ||
-            (/\badd\s+(to\s+cart|it|this)\b/i.test(msgLower) && !isBudgetAsk && !!productToAdd);
+        // 2A3. ADD TO CART HANDLER (Universal Semantic Intent)
+        const productToAdd = semanticIntent.targetProduct || matchedStoreProduct || ConversationEngine.sessionLastProduct.get(conversationId);
+        const isExplicitAddIntent = semanticIntent.action === 'ADD' && !!productToAdd;
         if (isExplicitAddIntent && productToAdd) {
             const cartItem = {
                 id: productToAdd.id,
@@ -607,8 +774,27 @@ export class ConversationEngine {
             this.recordTurn(conversationId, trimmedMessage, msg);
             return response;
         }
-        // 2B. CLEAR CART HANDLER
-        const isClearCartIntent = /\b(clear cart|empty cart|cart khali|sab hata do|poora cart khali|cart saaf)\b/i.test(msgLower);
+        // 2A3B. UNDERSPECIFIED ADD CLARIFICATION (HUMAN-LIKE ASKING)
+        if (semanticIntent.action === 'ADD' && !productToAdd) {
+            const askMsg = isUrduLang
+                ? "Main zaroor aapke cart mein product add kar doonga! Baraye meherbani batayein ke aap kon sa product ya compound (jaise **Tirz 10mg**, **Semaglutide**, ya **Bacteriostatic Water**) add karna chahte hain? Aap neeche diye gaye live catalog se bhi direct select kar sakte hain:"
+                : "I would be happy to add that to your cart! Could you please specify which product or compound (such as **Tirz 10mg**, **Semaglutide**, or **Bacteriostatic Water**) you would like to add? You can also select directly from our catalog below:";
+            const response = {
+                conversationId,
+                role: 'assistant',
+                message: askMsg,
+                productCards: storeProducts,
+                quickReplies: [
+                    { label: 'Tirz 10mg', actionText: 'tirz 10mg add karo' },
+                    { label: 'Bacteriostatic Water', actionText: 'bacteriostatic water add kardo' },
+                    { label: 'Show All Products', actionText: 'Show all products' }
+                ]
+            };
+            this.recordTurn(conversationId, trimmedMessage, askMsg);
+            return response;
+        }
+        // 2B. CLEAR CART HANDLER (Universal Semantic Intent)
+        const isClearCartIntent = semanticIntent.action === 'CLEAR_CART';
         if (isClearCartIntent) {
             ConversationEngine.clearSessionCart(conversationId);
             if (adapter.clearCart) {
@@ -633,10 +819,8 @@ export class ConversationEngine {
             this.recordTurn(conversationId, trimmedMessage, msg);
             return response;
         }
-        // 2C. VIEW / INSPECT CART HANDLER
-        const isViewCartIntent = /\b(view cart|show cart|my cart|mere cart|check cart|cart dikhao|cart check|cart mein kya|cart me kya|cart mai)\b/i.test(msgLower) ||
-            /\b(kon|kaun|which|kya)\b.*\b(product|products|item|items|compounds?)\b.*\b(sleect|select|add|liye|hain|hai|choose)\b/i.test(msgLower) ||
-            /\b(kitnay|kitna|how many)\b.*\b(product|products|item|items)\b.*\b(cart|sleect|select|liye)\b/i.test(msgLower);
+        // 2C. VIEW / INSPECT CART HANDLER (Universal Semantic Intent)
+        const isViewCartIntent = semanticIntent.action === 'VIEW_CART';
         if (isViewCartIntent) {
             const sessionItems = ConversationEngine.getSessionCart(conversationId);
             let msg;
@@ -682,9 +866,8 @@ export class ConversationEngine {
             this.recordTurn(conversationId, trimmedMessage, msg);
             return response;
         }
-        // 2D. ORDER CANCELLATION HANDLER
-        const isOrderCancelIntent = /\b(cancel(lation)?|mansookh|rok do|cancel karo|cancel karna)\b.*\b(order|booking|purchase)?\b/i.test(msgLower) ||
-            /\border\b.*\b(cancel|mansookh|rokna)\b/i.test(msgLower);
+        // 2D. ORDER CANCELLATION HANDLER (Universal Semantic Intent)
+        const isOrderCancelIntent = semanticIntent.action === 'CANCEL_ORDER';
         if (isOrderCancelIntent) {
             const orderMatch = msgLower.match(/#?(\d{3,7})\b/);
             const emailMatch = msgLower.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/);
@@ -744,10 +927,8 @@ export class ConversationEngine {
                 return response;
             }
         }
-        // 2E. ORDER TRACKING HANDLER
-        const isOrderTrackIntent = /\b(track(ing)?|status|kahan hai|kahan tak|kab aayega|pohanch|dispatch status)\b.*\b(order|parcel|package|shipment)?\b/i.test(msgLower) ||
-            /\border\b.*\b(kahan|status|track|check|kab|pohancha)\b/i.test(msgLower) ||
-            /#\d{3,7}\b/.test(msgLower);
+        // 2E. ORDER TRACKING HANDLER (Universal Semantic Intent)
+        const isOrderTrackIntent = semanticIntent.action === 'TRACK_ORDER';
         if (isOrderTrackIntent) {
             const orderMatch = msgLower.match(/#?(\d{3,7})\b/);
             if (orderMatch) {
@@ -797,10 +978,8 @@ export class ConversationEngine {
                 return response;
             }
         }
-        // 2F. PROCEED TO CHECKOUT HANDLER
-        // Matches: "procced kardoo", "proceed", "proced", "checkout", "pay", "order place", "finalize", etc.
-        const isCheckoutIntent = /\b(proc[ce]+d|check\s*out|checkout\s*link|pay|payment|kareedo|order place|finalize|buy now)\b/i.test(msgLower) &&
-            !/\b(policy|refund|shipping|terms|about)\b/i.test(msgLower);
+        // 2F. PROCEED TO CHECKOUT HANDLER (Universal Semantic Intent)
+        const isCheckoutIntent = semanticIntent.action === 'CHECKOUT';
         if (isCheckoutIntent) {
             const sessionItems = ConversationEngine.getSessionCart(conversationId);
             let itemsSummary = '';
@@ -984,14 +1163,24 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
    - You CAN track orders and cancel eligible unfulfilled orders.
    - If customer asks to track an order: Ask for their Order ID (e.g. #1042).
    - If customer asks to cancel an order: Explain that orders can be cancelled before warehouse dispatch, and ask for their Order ID + Billing Email for security verification.
-12. FULL CART MANAGEMENT (ADD, UN-CART, VIEW CART, CLEAR CART):
+12. FULL CART MANAGEMENT & ACTION DISPATCH (ADD, REMOVE, SWAP, UPDATE, CLEAR):
    - You CAN add items to cart, remove items from cart ("un-cart"), display cart link, and empty cart upon request.
-   - If customer asks to remove an item or uncart: Politely confirm the item has been removed from their cart.
+   - If customer requests adding, removing, swapping, or clearing cart, you MUST append a hidden action tag at the very end of your response:
+     <cart_action action="add|remove|swap|update|clear" product="Exact Product Title" quantity="1" />
+   - Confirm the action conversationally to the customer.
 13. ZERO MANUAL STEP-BY-STEP CART REMOVAL TUTORIALS:
    - UNDER NO CIRCUMSTANCES should you write a manual step-by-step tutorial (e.g. "1. Open cart in browser... 2. Find Tirz... 3. Click remove button... 4. Confirm popup") telling the customer to delete items themselves!
    - You are an automated commerce agent. All cart actions (add, remove, clear) are performed automatically by the assistant.
    - If a customer asks to remove, delete, or drop an item (e.g. "tirz hata do"), confirm immediately that it has been removed and provide direct links. NEVER output numbered tutorial steps!
    - NEVER attach product cards when the customer is removing items, viewing cart, or checking out.
+14. HUMAN-LIKE CLARIFICATION (ZERO ASSUMPTIONS WHEN INTENT OR PRODUCT IS UNCLEAR):
+   - If the customer's message or desire is ambiguous, vague, or incomplete (for example, they say "add to cart", "ye dedo", "badal do", or "update it" but did NOT specify WHICH compound, strength, or action):
+   - NEVER make blind assumptions or guess a random product!
+   - Act like a caring, polite senior customer care specialist: ask them a clear, friendly clarifying question so they can specify what they want.
+   - Example in Roman Urdu:
+     "Main zaroor aapki madad karunga! Baraye meherbani wazeh kar dein ke aap kon sa product ya strength (jaise Tirz 10mg, Tirz 60mg, ya Bacteriostatic Water) add ya update karna chahte hain?"
+   - Example in English:
+     "I would be glad to help! Could you please clarify which compound or strength you would like to select or update (e.g., Tirz 10mg, Tirz 60mg, or Bacteriostatic Water)?"
 `.trim();
         // Retrieve previous conversation turns for this session
         const pastTurns = this.sessionHistory.get(conversationId) || [];
@@ -1152,6 +1341,45 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
                 finalCards = storeProducts;
             }
         }
+        // Process machine-readable <cart_action> if emitted by AI
+        const cartActionMatch = replyText.match(/<cart_action\s+action=["']([^"']+)["'](?:\s+product=["']([^"']+)["'])?(?:\s+quantity=["']?(\d+)["']?)?\s*\/?>/i);
+        let aiCartAction = undefined;
+        if (cartActionMatch) {
+            const actionType = cartActionMatch[1].toLowerCase();
+            const prodName = (cartActionMatch[2] || '').trim();
+            const qty = parseInt(cartActionMatch[3] || '1', 10);
+            replyText = replyText.replace(/<cart_action[\s\S]*?\/?>/gi, '').trim();
+            const currentItems = ConversationEngine.getSessionCart(conversationId);
+            const resolved = ConversationEngine.resolveProductFromMessage(prodName, storeProducts) ||
+                storeProducts.find(p => p.title.toLowerCase().includes(prodName.toLowerCase()));
+            const adapter = CommerceAdapterFactory.getAdapter(tenant);
+            if (actionType === 'add' && resolved) {
+                ConversationEngine.addToSessionCart(conversationId, {
+                    id: resolved.id,
+                    title: resolved.title,
+                    price: resolved.price.regular,
+                    quantity: qty
+                });
+                if (adapter.addToCart)
+                    adapter.addToCart(resolved.id, undefined, qty, { shopperSessionId: input.shopperSessionId }).catch(() => { });
+                aiCartAction = { type: 'add', item: { id: resolved.id, title: resolved.title, price: resolved.price.regular, quantity: qty } };
+            }
+            else if (actionType === 'remove' && (resolved || currentItems.length > 0)) {
+                const itemToRemove = resolved ? currentItems.find(it => it.id === resolved.id) : currentItems[0];
+                if (itemToRemove) {
+                    ConversationEngine.removeFromSessionCart(conversationId, itemToRemove.id);
+                    if (adapter.removeFromCart)
+                        adapter.removeFromCart(itemToRemove.id, { shopperSessionId: input.shopperSessionId }).catch(() => { });
+                    aiCartAction = { type: 'remove', productId: itemToRemove.id, title: itemToRemove.title };
+                }
+            }
+            else if (actionType === 'clear') {
+                ConversationEngine.clearSessionCart(conversationId);
+                if (adapter.clearCart)
+                    adapter.clearCart({ shopperSessionId: input.shopperSessionId }).catch(() => { });
+                aiCartAction = { type: 'clear' };
+            }
+        }
         const quickReplies = [
             { label: 'View All Products', actionText: 'Show all products' },
             { label: 'Shipping Info', actionText: 'What is your shipping policy?' },
@@ -1162,6 +1390,7 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
             role: 'assistant',
             message: replyText,
             productCards: finalCards.length > 0 ? finalCards : undefined,
+            cartAction: aiCartAction,
             quickReplies
         };
     }

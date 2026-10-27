@@ -235,9 +235,158 @@ async function runTestSuite() {
   assert(cart3.some(it => it.title.toLowerCase().includes('semaglutide')), 'Contextually added Semaglutide from previous turn');
   assert(res.cartAction && res.cartAction.type === 'add', 'Cart action emitted for contextual add');
 
+  // TEST 19: Natural Phrasing Swap ("60 nahi 10 karna tha") - NO rigid keyword!
+  console.log('\n--- Step 19: Natural Phrasing Swap ("60 nahi 10 karna tha") ---');
+  const convId4 = `test_conv_natural_${Date.now()}`;
+  // Initially add Tirz 60mg
+  await ConversationEngine.processMessage({
+    conversationId: convId4,
+    message: 'tirz 60mg add karo',
+    tenant
+  });
+  // Now user says naturally: "60 nahi 10 karna tha"
+  res = await ConversationEngine.processMessage({
+    conversationId: convId4,
+    message: '60 nahi 10 karna tha',
+    tenant
+  });
+  let cart4 = ConversationEngine.getSessionCart(convId4);
+  assert(cart4.some(it => it.title.includes('10mg')), 'Successfully swapped to Tirz 10mg via natural phrasing');
+  assert(!cart4.some(it => it.title.includes('60mg')), 'Old Tirz 60mg removed');
+  assert(res.cartAction && res.cartAction.type === 'add', 'Cart action emitted for swap');
+
+  // TEST 20: Natural Phrasing Minus ("aik kam kar do") - NO keyword "minus"!
+  console.log('\n--- Step 20: Natural Phrasing Minus ("aik kam kar do") ---');
+  // Set quantity to 3 first
+  await ConversationEngine.processMessage({
+    conversationId: convId4,
+    message: '3 kardo',
+    tenant
+  });
+  res = await ConversationEngine.processMessage({
+    conversationId: convId4,
+    message: 'aik kam kar do',
+    tenant
+  });
+  cart4 = ConversationEngine.getSessionCart(convId4);
+  const curItem = cart4.find(it => it.title.includes('10mg'));
+  assert(curItem && curItem.quantity === 2, 'Quantity reduced to 2x via "aik kam kar do"', `Actual: ${curItem?.quantity}`);
+
+  // TEST 21: Natural Phrasing Add ("ye dalo basket mai") - NO keyword "add"!
+  console.log('\n--- Step 21: Natural Phrasing Add ("ye dalo basket mai") ---');
+  res = await ConversationEngine.processMessage({
+    conversationId: convId4,
+    message: 'bacteriostatic water ye dalo basket mai',
+    tenant
+  });
+  cart4 = ConversationEngine.getSessionCart(convId4);
+  assert(cart4.some(it => it.title.toLowerCase().includes('water')), 'Added Bacteriostatic Water via "dalo basket mai"');
+
+  // TEST 22: Natural Phrasing Delete ("isko mat lena") - NO keyword "remove"/"delete"!
+  console.log('\n--- Step 22: Natural Phrasing Delete ("water mat lena") ---');
+  res = await ConversationEngine.processMessage({
+    conversationId: convId4,
+    message: 'water mat lena',
+    tenant
+  });
+  cart4 = ConversationEngine.getSessionCart(convId4);
+  assert(!cart4.some(it => it.title.toLowerCase().includes('water')), 'Removed Water via "mat lena"');
+
+  // TEST 23: Natural Phrasing Checkout ("bill banao") - NO keyword "checkout"!
+  console.log('\n--- Step 23: Natural Phrasing Checkout ("bill banao") ---');
+  res = await ConversationEngine.processMessage({
+    conversationId: convId4,
+    message: 'bill banao payment karni hai',
+    tenant
+  });
+  assert(res.message.includes('checkout') && res.message.includes('colbolt.hawksnfox.com/checkout'), 'Provided checkout link for "bill banao payment karni hai"');
+
+  // TEST 24: Real User Transcript Sequence ("1 or add akrdoo" -> "1 kam akrdooo")
+  console.log('\n--- Step 24: User Sequence ("1 or add akrdoo" -> "1 kam akrdooo") ---');
+  const convId5 = `test_conv_user_${Date.now()}`;
+  // 1. Initial add
+  await ConversationEngine.processMessage({
+    conversationId: convId5,
+    message: 'bacteriostatic water add akrdoo',
+    tenant
+  });
+  // 2. Add 1 more: "1 or add akrdoo"
+  await ConversationEngine.processMessage({
+    conversationId: convId5,
+    message: '1 or add akrdoo',
+    tenant
+  });
+  let cart5 = ConversationEngine.getSessionCart(convId5);
+  let waterItem = cart5.find(it => it.title.toLowerCase().includes('water'));
+  assert(waterItem && waterItem.quantity === 2, 'Quantity increased to 2x via "1 or add akrdoo"');
+
+  // 3. Subtract 1: "1 kam akrdooo"
+  res = await ConversationEngine.processMessage({
+    conversationId: convId5,
+    message: '1 kam akrdooo',
+    tenant
+  });
+  cart5 = ConversationEngine.getSessionCart(convId5);
+  waterItem = cart5.find(it => it.title.toLowerCase().includes('water'));
+  assert(waterItem && waterItem.quantity === 1, 'Quantity successfully reduced to 1x via "1 kam akrdooo"', `Actual: ${waterItem?.quantity}`);
+  assert(res.cartAction && (res.cartAction.type === 'update' || res.cartAction.type === 'remove'), 'Emitted cartAction for reduction');
+
+  // 4. Cart check: "hua nhin likn cart mai kam"
+  res = await ConversationEngine.processMessage({
+    conversationId: convId5,
+    message: 'hua nhin likn cart mai kam',
+    tenant
+  });
+  assert(res.message.includes('1x') || res.message.includes('$15.00'), 'Cart inspection accurately shows 1x ($15.00), NOT 2x ($30.00)!');
+
+  // TEST 25: Farewell ("byee")
+  console.log('\n--- Step 25: Farewell ("byee") ---');
+  res = await ConversationEngine.processMessage({
+    conversationId: convId5,
+    message: 'byee',
+    tenant
+  });
+  assert(res.message.toLowerCase().includes('allah hafiz') || res.message.toLowerCase().includes('goodbye'), 'Returns polite farewell for "byee"');
+  assert(!res.message.includes('Main bilkul theek hoon'), 'Does NOT say "Main bilkul theek hoon" for bye!');
+
+  // TEST 26: Company Inquiry ("cobolt karta kia hai yh company??")
+  console.log('\n--- Step 26: Company Inquiry ("cobolt karta kia hai yh company??") ---');
+  res = await ConversationEngine.processMessage({
+    conversationId: convId5,
+    message: 'cobolt karta kia hai yh company??',
+    tenant
+  });
+  assert(res.message.toLowerCase().includes('research') || res.message.toLowerCase().includes('peptide') || res.message.toLowerCase().includes('colbolt'), 'Answers what company Colbolt does');
+  assert(!res.message.includes('Aap bar bar fazool baatein'), 'Does NOT treat company question as time-wasting!');
+
+  // TEST 27: Human-like Clarification for Vague Add ("add kardo" with no product in context)
+  console.log('\n--- Step 27: Human-like Clarification for Vague Add ("add kardo") ---');
+  const convId6 = `test_conv_vague_${Date.now()}`;
+  res = await ConversationEngine.processMessage({
+    conversationId: convId6,
+    message: 'add kardo',
+    tenant
+  });
+  assert(res.message.includes('kon sa product') || res.message.toLowerCase().includes('specify which product') || res.message.includes('Tirz'), 'Asks human-like clarification when product is not specified');
+  assert(res.productCards && res.productCards.length > 0, 'Offers catalog cards so user can pick easily');
+
+  // TEST 28: Human-like Clarification for Vague Swap ("badal do" with no target specified)
+  console.log('\n--- Step 28: Human-like Clarification for Vague Swap ("badal do") ---');
+  await ConversationEngine.processMessage({
+    conversationId: convId6,
+    message: 'tirz 60mg add karo',
+    tenant
+  });
+  res = await ConversationEngine.processMessage({
+    conversationId: convId6,
+    message: 'badal do',
+    tenant
+  });
+  assert(res.message.includes('replace') || res.message.includes('strength') || res.message.includes('badalna chahte'), 'Asks human-like clarification for vague swap');
+
   console.log('\n================================================================');
   if (allPassed) {
-    console.log('🎉 ALL 18 VERIFICATION TESTS PASSED WITH 100% ACCURACY!');
+    console.log('🎉 ALL 28 VERIFICATION TESTS PASSED WITH 100% ACCURACY!');
   } else {
     console.error('❌ SOME TESTS FAILED. PLEASE REVIEW OUTPUT ABOVE.');
   }
