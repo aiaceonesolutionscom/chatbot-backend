@@ -1828,9 +1828,10 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
     replyText = replyText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     replyText = replyText.replace(/<tool_call>.*?<\/tool_call>/gis, '').replace(/<tool_call>.*$/gis, '').trim();
 
-    // Clean AI guardrail / safety tags (e.g. "User Safety: safeResponse Safety: safe")
+    // Clean AI guardrail / safety tags (e.g. "User Safety: safeResponse Safety: safe", "Safety Categories: ...")
     replyText = replyText
       .replace(/(?:User|Response)\s*Safety:\s*(?:safe|unsafe)\s*/gi, '')
+      .replace(/Safety\s*Categories:\s*[^\n]*/gi, '')
       .replace(/^(?:Safe|Unsafe)\s*\n/gi, '')
       .trim();
 
