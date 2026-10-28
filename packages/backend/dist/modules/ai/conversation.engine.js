@@ -304,24 +304,29 @@ export class ConversationEngine {
         // Matches: "i want to add a product but i didnt know what you have?", "what do you have?", "apke pas kya hai", "kia bechtay ho", "que tienen"
         const isCatalogInquiry = /\b(what\s*(do\s*you|you|can\s*i)\s*have|didn'?t\s*know\s*what\s*you\s*have|don'?t\s*know\s*what\s*you\s*have|not\s*sure\s*what\s*you\s*have|what\s*(are\s*your\s*products|do\s*you\s*sell)|show\s*(me\s*)?(products?|catalog|what\s*you\s*have)|what\s*(can\s*i\s*add|are\s*the\s*options))\b/i.test(msgLower) ||
             /\b(kya\s*(bechtay|sell|hai|rakhtay|available)|kia\s*(bechtay|sell|hai|rakhtay|available)|apke\s*pas\s*(kia|kya)|tumharay\s*pas\s*(kia|kya)|app\s*kia\s*kai\s*bechtay)\b/i.test(msgLower) ||
+            /\b(kon\s*kon\s*s[aei]|product\s*hai\s*kon|kia\s*kia\s*hai|kya\s*kya\s*hai|tumharay\s*(paas|pas|apas)|apke\s*(paas|pas|apas))\b/i.test(msgLower) ||
             /\b(que\s*tienen|que\s*tienes|cuales\s*productos|que\s*venden)\b/i.test(msgLower);
         if (isCatalogInquiry) {
             return { action: 'NONE', quantity: 0 };
         }
+        // Explicit Negation Guard: If customer states they do NOT want to add, NEVER trigger ADD!
+        const isNegatedAdd = /\b(nhi|nahi|nhin|mat|don'?t|not|never|no|stop|baghair|without)\b.*\b(add|dalo|daal|shamil)\b/i.test(msgLower) ||
+            /\b(add|dalo|daal|shamil)\b.*\b(nhi|nahi|nhin|mat|don'?t|not|never)\b/i.test(msgLower);
         // 9. ADD TO CART INTENT (MUST NOT be triggered as VIEW_CART)
         // Matches: "tirz 10 mg add akroo cart mai", "1 or add akrdoo", "bacteriostatic water add kardo", "ye dalo basket mai"
-        const isAddWord = /\b(add|dalo|daal|daalo|shamil|pack|bhej\s*do|bhejo|de\s*do|dedo|lena\s*hai|khareedna|kharidna|mangwana|order\s*karo|basket\s*mai|khud\s*akrdo|a[fd]+|1\s*or|ek\s*aur|aik\s*aur|agrega\w*|anade|anadir|pon)\b/i.test(msgLower);
-        const isDesirePhrase = /\b(chahiye|mujhay\s*chahiye|yehi\s*chahiye|yehi\s*dedo|yehi\s*bhej\s*do|lena\s*chahta|quiero)\b/i.test(msgLower);
+        const isAddWord = !isNegatedAdd && /\b(add|dalo|daal|daalo|shamil|pack|bhej\s*do|bhejo|de\s*do|dedo|lena\s*hai|khareedna|kharidna|mangwana|order\s*karo|basket\s*mai|khud\s*akrdo|a[fd]+|1\s*or|ek\s*aur|aik\s*aur|agrega\w*|anade|anadir|pon)\b/i.test(msgLower);
+        const isDesirePhrase = !isNegatedAdd && /\b(chahiye|mujhay\s*chahiye|yehi\s*chahiye|yehi\s*dedo|yehi\s*bhej\s*do|lena\s*chahta|quiero)\b/i.test(msgLower);
         const isBudgetAsk = /\b(budget|\$|dollar|sasta|chhota|kam price|under)\b/i.test(msgLower);
-        const isContextAddPhrase = /\b(khud\s*akrdo|khud\s*add|ye\s*add|yeh\s*add|isko\s*(add|dalo)|add\s*(this|it)|put\s*it|take\s*it|1\s*or|ek\s*aur|aik\s*aur|one\s*more|add\s*more|another)\b/i.test(msgLower);
+        const isContextAddPhrase = !isNegatedAdd && /\b(khud\s*akrdo|khud\s*add|ye\s*add|yeh\s*add|isko\s*(add|dalo)|add\s*(this|it)|put\s*it|take\s*it|1\s*or|ek\s*aur|aik\s*aur|one\s*more|add\s*more|another)\b/i.test(msgLower);
         const validAddCandidate = targetProduct || (isContextAddPhrase ? (lastProduct || lastCartProd) : undefined);
-        const isAddIntent = ((isAddWord && (!!validAddCandidate || /\b(cart|basket|it|yeh|ye|woh|wo)\b/i.test(msgLower))) ||
-            (isDesirePhrase && !!validAddCandidate && !/\b(policy|shipping|info|kya|kia|price|qeemat)\b/i.test(msgLower)) ||
-            (!!targetProduct && /\b(akrdoo|kardo|kar\s*do|bhejo|dalo|lena|agrega|pon)\b/i.test(msgLower))) && !isBudgetAsk;
+        const isAddIntent = !isNegatedAdd &&
+            ((isAddWord && (!!validAddCandidate || /\b(cart|basket|it|yeh|ye|woh|wo)\b/i.test(msgLower))) ||
+                (isDesirePhrase && !!validAddCandidate && !/\b(policy|shipping|info|kya|kia|price|qeemat)\b/i.test(msgLower)) ||
+                (!!targetProduct && /\b(akrdoo|kardo|kar\s*do|bhejo|dalo|lena|agrega|pon)\b/i.test(msgLower))) && !isBudgetAsk;
         if (isAddIntent && validAddCandidate) {
             return { action: 'ADD', targetProduct: validAddCandidate, quantity: parsedQty };
         }
-        if (isAddWord && !validAddCandidate && !isBudgetAsk && !isCatalogInquiry) {
+        if (isAddWord && !validAddCandidate && !isBudgetAsk && !isCatalogInquiry && !isNegatedAdd) {
             return { action: 'ADD', targetProduct: undefined, quantity: parsedQty };
         }
         // 10. VIEW CART INTENT (Strictly only when viewing, NOT when adding!)
@@ -492,6 +497,32 @@ export class ConversationEngine {
         if (Array.isArray(input.cartItems) && input.cartItems.length > 0) {
             ConversationEngine.sessionCarts.set(conversationId, [...input.cartItems]);
         }
+        // =========================================================================
+        // 3. PRIMARY AGENTIC AI: Model-First Intent & Autonomous Multi-Action Engine
+        // =========================================================================
+        // Every customer inquiry is processed directly by the AI Model (Google Gemini).
+        // The AI Model has access to the full multi-turn conversation history, live store catalog, and real-time shopper cart.
+        // It autonomously interprets nuance, Roman Urdu, slang, negations ("add nahi karna"),
+        // relative quantity increments ("1 barha do", "1 or plus akrdo"), and compound multi-step requests.
+        const rawGeminiEnv = process.env.GEMINI_API_KEY || tenant.ai?.geminiApiKey;
+        const geminiApiKey = (rawGeminiEnv && !rawGeminiEnv.includes('YOUR_GEMINI'))
+            ? rawGeminiEnv
+            : Buffer.from('QVEuQWI4Uk42THBjeFlIZVV2VXVzQmFtQzNOZVVHQUViLVlUWUpKaTkwY0t3bnZxS2oxb1E=', 'base64').toString('utf-8');
+        const groqApiKey = process.env.GROQ_API_KEY || tenant.ai?.groqApiKey || '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';
+        const openRouterApiKey = process.env.OPENROUTER_API_KEY || tenant.ai?.openrouterApiKey || tenant.ai?.apiKey;
+        try {
+            const aiResponse = await this.askAI(input, storeProducts, geminiApiKey, groqApiKey, openRouterApiKey);
+            if (aiResponse) {
+                this.recordTurn(conversationId, trimmedMessage, aiResponse.message);
+                return aiResponse;
+            }
+        }
+        catch (err) {
+            console.warn(`[ConversationEngine] Primary AI execution error for tenant ${tenant.siteKey}, falling back to deterministic safety engine:`, err);
+        }
+        // =========================================================================
+        // 4. DETERMINISTIC SAFETY FALLBACK (Executed only if AI providers are unreachable)
+        // =========================================================================
         // 1. Resolve product with 100% dosage precision from message
         const matchedStoreProduct = ConversationEngine.resolveProductFromMessage(msgLower, storeProducts);
         if (matchedStoreProduct) {
@@ -514,9 +545,13 @@ export class ConversationEngine {
         const hasSwapOrAddVerb = /\b(aur|or|ro|and|nd|y|\+)\b.*\b(add|dalo|daal|shamil|pack|bhejo|lena|dedo|dollar|\$|budget|pon|agrega\w*|anad\w*)\b/i.test(msgLower) ||
             /\b(ki\s*jagah|iski\s*jagah|uski\s*jagah|ke\s*badle|ke\s*bajaye|instead\s*of|in\s*place\s*of|en\s*lugar\s*de|replace\s*with|swap\s*with)\b/i.test(msgLower);
         const hasQtyVerb = /\b(qty|quantity|barha\w*|double|dabal|do\s*guna|2x|kam\s*k\w*|minus|ghata\w*)\b/i.test(msgLower);
+        const hasMultipleProducts = (msgLower.match(/\b(tirz|semaglutide|sema|retatrutide|reta|water|bacteriostatic)\b/gi) || []).length >= 2 ||
+            (msgLower.match(/\b\d+\s*mg\b/gi) || []).length >= 2;
+        const hasConjunction = /[,;\n]|\b(?:aur|or|ro|and|nd|y|phir|uske\s*baad|then)\b/i.test(msgLower);
         const isCompoundMultiAction = (hasRemoveVerb && (hasSwapOrAddVerb || hasQtyVerb)) ||
-            (hasRemoveVerb && currentSessionItems.length > 0 && /[,;\n]|\b(?:aur|or|ro|and|nd|y|phir|uske\s*baad|then)\b/i.test(msgLower)) ||
-            (hasSwapOrAddVerb && hasQtyVerb && currentSessionItems.length > 0);
+            (hasRemoveVerb && currentSessionItems.length > 0 && hasConjunction) ||
+            (hasSwapOrAddVerb && hasQtyVerb && currentSessionItems.length > 0) ||
+            (hasMultipleProducts && hasConjunction && (hasQtyVerb || hasSwapOrAddVerb || /\bkardoo|kar\s*do|karo\b/i.test(msgLower)));
         if (isCompoundMultiAction) {
             const clauses = msgLower
                 .split(/[,;\n]|\b(?:aur|or|ro|and|nd|y|phir|uske\s*baad|iske\s*baad|then|after\s*that|pero|luego|ki\s*jagah|iski\s*jagah|uski\s*jagah|ke\s*badle|ke\s*bajaye|instead\s*of|in\s*place\s*of|en\s*lugar\s*de|replace\s*with|swap\s*with)\b/i)
@@ -598,14 +633,18 @@ export class ConversationEngine {
                 }
                 // Parse quantity
                 let qty = 1;
+                const cleanClause = clause.replace(/\b\d+\s*(?:mg|m)\b/gi, '').trim();
+                const qm = cleanClause.match(/(?:qty|quantity)\s*([1-9]\d?)\b/i) ||
+                    cleanClause.match(/\b([1-9]\d?)\s*(?:x|qty|pieces?|vials?|bottles?)?\b/i);
+                const parsedClauseQty = qm ? parseInt(qm[1], 10) : 1;
                 if (/double|dabal|do\s*guna|2x/i.test(clause)) {
                     qty = cartItem ? Math.max(2, cartItem.quantity * 2) : 2;
                 }
+                else if (/\b(barha\w*|badha\w*|plus|aur|more)\b/i.test(clause)) {
+                    qty = cartItem ? cartItem.quantity + parsedClauseQty : parsedClauseQty;
+                }
                 else {
-                    const cleanClause = clause.replace(/\b\d+\s*(?:mg|m)\b/gi, '').trim();
-                    const qm = cleanClause.match(/\b([1-9]|10)\s*(?:x|qty|pieces?|vials?|bottles?)?\b/i);
-                    if (qm)
-                        qty = parseInt(qm[1], 10);
+                    qty = parsedClauseQty;
                 }
                 const hasExplicitVerb = isRemove || isQty || isAdd;
                 if (prod || cartItem) {
@@ -1147,14 +1186,20 @@ export class ConversationEngine {
                 this.recordTurn(conversationId, trimmedMessage, msg);
                 return response;
             }
-            // ONLY if user did NOT specify any product at all (e.g. just said "qty 7 kardo"), fall back to last item in cart:
-            if (!targetItem && !desiredProduct && sessionItems.length > 0) {
-                targetItem = sessionItems[sessionItems.length - 1];
+            // ONLY if user did NOT specify any product at all (e.g. just said "qty 7 kardo" or "1 or plus akrdo"), fall back to last session product or last item in cart:
+            if (!targetItem && !desiredProduct) {
+                if (lastSessionProduct) {
+                    targetItem = sessionItems.find(it => it.id === lastSessionProduct.id || it.title.toLowerCase() === lastSessionProduct.title.toLowerCase());
+                }
+                if (!targetItem && sessionItems.length > 0) {
+                    targetItem = sessionItems[sessionItems.length - 1];
+                }
             }
             if (targetItem) {
+                const isIncrease = /\b(barha\w*|badha\w*|plus|aur|more|add|extra)\b/i.test(msgLower) || /\b(1\s*or|ek\s*aur|aik\s*aur)\b/i.test(msgLower);
                 let newQty = targetItem.quantity + 1;
-                if (qtyMatch) {
-                    newQty = parsedQty;
+                if (isIncrease) {
+                    newQty = targetItem.quantity + (parsedQty || 1);
                 }
                 else if (/\bdouble\b/i.test(msgLower)) {
                     newQty = targetItem.quantity * 2;
@@ -1162,8 +1207,8 @@ export class ConversationEngine {
                 else if (/\btriple\b/i.test(msgLower)) {
                     newQty = targetItem.quantity * 3;
                 }
-                else if (/\b(barha\w*|badha\w*|plus|aur|more)\b/i.test(msgLower)) {
-                    newQty = targetItem.quantity + 1;
+                else if (qtyMatch) {
+                    newQty = parsedQty;
                 }
                 targetItem.quantity = newQty;
                 ConversationEngine.setSessionCartQuantity(conversationId, targetItem.id, newQty);
@@ -1492,25 +1537,7 @@ export class ConversationEngine {
             this.recordTurn(conversationId, trimmedMessage, msg);
             return response;
         }
-        // 3. Query AI (Primary: Google Gemini Free Tier 1M TPM / 1,500 RPD -> Groq Cloud 14,400 RPD -> OpenRouter)
-        const rawGeminiEnv = process.env.GEMINI_API_KEY || tenant.ai?.geminiApiKey;
-        const geminiApiKey = (rawGeminiEnv && !rawGeminiEnv.includes('YOUR_GEMINI'))
-            ? rawGeminiEnv
-            : Buffer.from('QVEuQWI4Uk42THBjeFlIZVV2VXVzQmFtQzNOZVVHQUViLVlUWUpKaTkwY0t3bnZxS2oxb1E=', 'base64').toString('utf-8');
-        const groqApiKey = process.env.GROQ_API_KEY || tenant.ai?.groqApiKey || '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';
-        const openRouterApiKey = process.env.OPENROUTER_API_KEY || tenant.ai?.openrouterApiKey || tenant.ai?.apiKey;
-        try {
-            const aiResponse = await this.askAI(input, storeProducts, geminiApiKey, groqApiKey, openRouterApiKey);
-            if (aiResponse) {
-                // Record successful turn in session memory
-                this.recordTurn(conversationId, trimmedMessage, aiResponse.message);
-                return aiResponse;
-            }
-        }
-        catch (err) {
-            console.warn(`[ConversationEngine] AI query error for ${tenant.siteKey}, fallback:`, err);
-        }
-        // 4. Bulletproof Fallback Knowledge Base (Only if both Groq and OpenRouter are unreachable)
+        // 4. Bulletproof Fallback Knowledge Base (Only if both AI and deterministic rules found no match)
         const fallback = this.fallbackResponse(input, storeProducts);
         this.recordTurn(conversationId, trimmedMessage, fallback.message);
         return fallback;
@@ -1612,16 +1639,38 @@ ${productListText || 'No products listed.'}
 CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
 0. CORE AGENTIC PRINCIPLE (INTENT-FIRST AUTONOMOUS MULTI-ACTION PLANNING):
    - DEEPLY COMPREHEND USER INTENT: Read beyond literal words and rigid keywords. Discern what the user truly wants to achieve across all clauses, whether they speak in Roman Urdu ("ghuma phera ke bolen"), English, Spanish, or casual slang.
-   - COMPOUND MULTI-ACTION EXECUTION IN A SINGLE TURN: If a customer requests multiple actions in a single message (e.g. adding 4 products, removing 3 products, and doubling or adjusting the quantity of other products), you MUST plan and execute ALL of them decisively in that single turn!
+   - COMPOUND MULTI-ACTION EXECUTION IN A SINGLE TURN: If a customer requests multiple actions in a single message (e.g. "tirz 10 mg ki qty 5 kardoo or tirz 30 mg ki qty 10 akrdoo", or adding 2 products and removing 1 product), you MUST plan and execute ALL of them decisively in that single turn!
    - EMIT SEQUENTIAL CART ACTIONS: For every discrete operation, append a hidden machine-readable tag at the very end of your response:
      <cart_action action="add" product="Exact Product Title" quantity="N" />
-     <cart_action action="remove" product="Exact Product Title" quantity="N" />
+     <cart_action action="remove" product="Exact Product Title" />
      <cart_action action="update" product="Exact Product Title" quantity="N" />
      <cart_action action="clear" />
    - TYPO & PHONETIC RESILIENCE: Users frequently make spelling errors or use colloquial abbreviations (e.g., "trirz", "triz", "irz" -> Tirz; "sema", "semaglutude" -> Semaglutide; "reta" -> Retatrutide; "bac water", "wtr" -> Bacteriostatic Water; "dabal", "do guna" -> 2x quantity). Intelligently map these to our exact catalog products.
    - POLITE HUMAN CLARIFICATION ON AMBIGUITY: If a request is completely ambiguous or missing crucial dosage info (e.g. user says "tirz add kardo" without specifying 10mg, 30mg, or 60mg), DO NOT guess blindly! Ask a polite, friendly clarifying question like a senior customer support specialist.
 
-1. STRICT DOMAIN BOUNDARY:
+1. EXPLICIT NEGATION & REJECTION (NEVER ADD IF USER SAYS NOT TO):
+   - If user says "add nahi karna", "add nhin akrnay", "products add nhin karny", "mat dalo", "don't add", "no need to add", "baghair add kiye":
+     The customer is EXPLICITLY stating they do NOT want to add items!
+     NEVER emit an add <cart_action> tag! NEVER say "Main add kar doonga" or ask what to add.
+     Answer their inquiry directly and informatively (e.g. list products and prices) with zero cart additions.
+
+2. RELATIVE INCREMENTS / DECREMENTS vs ABSOLUTE SET (CHECK CURRENT CART):
+   - Always check the CURRENT SHOPPER CART above:
+     * Relative Increments ("1 barha do", "1 aur plus kardo", "1 or plus akrdo", "ek aur add kardo", "increase by 1", "add one more"):
+       Find the relevant item in CURRENT SHOPPER CART. If its current qty is Q, the new quantity is Q + 1!
+       Emit: <cart_action action="update" product="Exact Title" quantity="Q+1" />
+     * Relative Decrements ("1 kam kardo", "minus 1", "ghata do", "reduce by 1"):
+       If current qty is Q, new quantity is max(1, Q - 1).
+       Emit: <cart_action action="update" product="Exact Title" quantity="Q-1" />
+     * Absolute Sets ("qty 5 kardo", "tirz 10 mg ki qty 5 kardoo or tirz 30 mg ki qty 10 akrdoo", "set to 10"):
+       This is an absolute set. Set the exact numbers requested!
+       Emit: <cart_action action="update" product="Exact Title" quantity="5" />
+     * Double / 2x ("double kardo", "dabal", "2x"):
+       New quantity is Q * 2.
+     * Contextual Continuity ("1 or plus akrdo", "iski quantity barhao"):
+       If user does not repeat the product name, apply to the product discussed or modified in the immediately preceding turn.
+
+3. STRICT DOMAIN BOUNDARY:
    - You are ONLY permitted to talk about ${companyName}, research peptides, diluents (Bacteriostatic Water), pricing, availability, orders, and shipping.
    - If the user asks anything outside this domain (politics, programming, homework, random questions, recipes), politely decline:
      "Maaf kijiye ga, mujhay is baray mein baat karnay ki ijazat nahi hai. Main sirf ${companyName} ke research compounds, peptides, orders aur shipping ke hawale se aapki madad kar sakta hoon."
@@ -1694,18 +1743,15 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
         // 0. PRIMARY AI: GOOGLE GEMINI (1,500 Requests/Day, 1,000,000 Tokens/Min, 100% Free Forever)
         if (geminiApiKey && !this.geminiAuthFailed) {
             const geminiModels = [
-                'gemini-3.5-flash',
                 'gemini-3.5-flash-lite',
-                'gemini-3.6-flash',
-                'gemini-3.7-flash',
-                'gemini-3.8-flash',
-                'gemma-4-26b-a4b-it'
+                'gemini-3.1-flash-lite',
+                'gemini-flash-lite-latest'
             ];
             for (const gModel of geminiModels) {
                 if (replyText)
                     break;
                 const ctrl = new AbortController();
-                const timeoutId = setTimeout(() => ctrl.abort(), 8000);
+                const timeoutId = setTimeout(() => ctrl.abort(), 15000);
                 try {
                     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${gModel}:generateContent?key=${geminiApiKey}`;
                     const res = await fetch(geminiUrl, {
@@ -1727,7 +1773,7 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
                                 }
                             ],
                             generationConfig: {
-                                temperature: 0.25,
+                                temperature: 0.15,
                                 maxOutputTokens: 1500
                             }
                         })
@@ -1743,9 +1789,13 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
                     }
                     else {
                         console.warn(`[Gemini] Model ${gModel} HTTP ${res.status}`);
-                        if (res.status === 400 || res.status === 401 || res.status === 403) {
-                            this.geminiAuthFailed = true;
-                            break;
+                        if (res.status === 401) {
+                            const errData = await res.json().catch(() => ({}));
+                            const errMsg = (errData?.error?.message || '').toLowerCase();
+                            if (errMsg.includes('api_key_invalid') || errMsg.includes('api key not valid')) {
+                                this.geminiAuthFailed = true;
+                                break;
+                            }
                         }
                     }
                 }
@@ -1894,7 +1944,8 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
         // High-Precision Product Matching: Respects exact compound, dosage & budget
         const relevantCards = this.matchProductsPrecisely(storeProducts, message, replyText, budgetNum);
         // Strict Guard: NEVER attach product cards if user query is cart removal, cart view, checkout, tracking, or cancellation
-        const isCartOrCheckoutOrRemoval = /\b(hata|hatao|nikaal|nikal|remove|delete|uncart|un-cart|drop|clear|empty cart|checkout|procc?eed|pay|payment|track|tracking|cancel order|shopping cart|mere cart|my cart|in my cart|kitnay product|kon kon sai product)\b/i.test(messageLower);
+        const isCartOrCheckoutOrRemoval = /\b(hata|hatao|nikaal|nikal|remove|delete|uncart|un-cart|drop|clear|empty cart|checkout|procc?eed|pay|payment|track|tracking|cancel order|quantity|qty|barha|ghata|double|dabal|kam\s*k|plus)\b/i.test(messageLower) ||
+            (/\b(shopping cart|mere cart|my cart|in my cart)\b/i.test(messageLower) && !/\b(product|products|catalog|all|dikhao|batao)\b/i.test(messageLower));
         let finalCards = isCartOrCheckoutOrRemoval ? [] : relevantCards;
         if (finalCards.length === 0 && !isCartOrCheckoutOrRemoval) {
             const isRefusal = replyLower.includes('ijazat nahi') || replyLower.includes('not authorized');
@@ -1938,7 +1989,9 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
                     collectedCartActions.push(actionObj);
                 }
                 else if (actionType === 'remove' && (resolved || currentItems.length > 0)) {
-                    const itemToRemove = resolved ? currentItems.find(it => it.id === resolved.id) : currentItems[0];
+                    const itemToRemove = resolved
+                        ? currentItems.find(it => it.id === resolved.id || it.title.toLowerCase() === resolved.title.toLowerCase() || (it.title && resolved.title && it.title.toLowerCase().replace(/\s+/g, '') === resolved.title.toLowerCase().replace(/\s+/g, '')))
+                        : currentItems[0];
                     if (itemToRemove) {
                         ConversationEngine.removeFromSessionCart(conversationId, itemToRemove.id);
                         if (adapter.removeFromCart)
@@ -1949,12 +2002,27 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
                     }
                 }
                 else if (actionType === 'update' && (resolved || currentItems.length > 0)) {
-                    const itemToUpdate = resolved ? currentItems.find(it => it.id === resolved.id) : currentItems[currentItems.length - 1];
+                    const itemToUpdate = resolved
+                        ? currentItems.find(it => it.id === resolved.id || it.title.toLowerCase() === resolved.title.toLowerCase() || (it.title && resolved.title && it.title.toLowerCase().replace(/\s+/g, '') === resolved.title.toLowerCase().replace(/\s+/g, '')))
+                        : currentItems[currentItems.length - 1];
                     if (itemToUpdate) {
                         ConversationEngine.setSessionCartQuantity(conversationId, itemToUpdate.id, qty);
                         if (adapter.addToCart)
                             adapter.addToCart(itemToUpdate.id, undefined, qty, { shopperSessionId: input.shopperSessionId }).catch(() => { });
                         const actionObj = { type: 'update', item: { id: itemToUpdate.id, title: itemToUpdate.title, price: itemToUpdate.price, quantity: qty } };
+                        aiCartAction = actionObj;
+                        collectedCartActions.push(actionObj);
+                    }
+                    else if (resolved) {
+                        ConversationEngine.addToSessionCart(conversationId, {
+                            id: resolved.id,
+                            title: resolved.title,
+                            price: resolved.price.regular,
+                            quantity: qty
+                        });
+                        if (adapter.addToCart)
+                            adapter.addToCart(resolved.id, undefined, qty, { shopperSessionId: input.shopperSessionId }).catch(() => { });
+                        const actionObj = { type: 'add', item: { id: resolved.id, title: resolved.title, price: resolved.price.regular, quantity: qty } };
                         aiCartAction = actionObj;
                         collectedCartActions.push(actionObj);
                     }
