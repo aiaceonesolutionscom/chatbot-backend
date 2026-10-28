@@ -49,6 +49,35 @@ export class ConversationEngine {
   private static sessionCarts: Map<string, SessionCartItem[]> = new Map();
 
   /**
+   * Tracks the detected natural language per conversation session ('urdu' | 'spanish' | 'english')
+   */
+  public static sessionLanguages: Map<string, 'urdu' | 'spanish' | 'english'> = new Map();
+
+  /**
+   * Robust user language detector:
+   * Accurately distinguishes English, Roman Urdu / Urdu, and Spanish using token density scoring.
+   * If input is ambiguous (e.g. numbers, "ok", product names), it retains the active conversation language.
+   */
+  public static detectUserLanguage(message: string, previousLanguage?: 'urdu' | 'spanish' | 'english'): 'urdu' | 'spanish' | 'english' {
+    const msg = (message || '').toLowerCase().trim();
+    if (!msg) return previousLanguage || 'english';
+
+    const spanishMatches = msg.match(/\b(hola|buenos?\s*d[ií]as?|buenas?\s*tardes?|por\s*favor|gracias|cu[aá]nto|cu[aá]ntos|cuesta|cuestan|precio|precios|productos?|carrito|a[ñn]adir|agregar|eliminar|quitar|cambiar|tienen|tienes|quiero|puedo|ayuda|env[ií]o|env[ií]os|pol[ií]tica|pol[ií]ticas|disponible|disponibles|comprar|pedido|pedidos|cuenta|buenas)\b/gi) || [];
+    const urduMatches = msg.match(/\b(kya|kia|hai|hain|he|karo|karein|kardo|akrdo|akrdoo|kardoo|karwao|mujhay|mujh|mujhe|batao|bataen|bataiye|aap|ap|tum|tumhara|tumharay|tumhare|teray|tere|kaise|kaisay|kese|chahiye|chahaiye|ye|yeh|wo|woh|nhi|nahi|nhin|mat|hata|hatao|nikaal|nikal|nikalo|rok|mera|mere|meri|apka|aapka|apke|aapke|bhi|aur|shamil|dalo|daal|daalo|kitna|kitnay|kitni|paas|pas|apas|salam|asalam|assalam|aoa|theek|thik|acha|achha|accha|sunao|chal|raha|hoga|karna|chaho|barha|badha|ghata|kam|dastyab|bechtay|mangwana|khareedna|kharedna|khareed|kon|sia|konsa|konsi|walay)\b/gi) || [];
+    const englishMatches = msg.match(/\b(what|how|why|when|where|who|which|please|thank|thanks|show|view|cart|add|remove|delete|update|products?|price|prices|pricing|shipping|order|orders|buy|checkout|policy|policies|help|can|could|would|will|you|your|our|are|is|do|does|did|have|has|want|need|looking|available|stock|tell|me|give|send|today|welcome|hello|hi|hey|good\s*morning|good\s*evening)\b/gi) || [];
+
+    const esScore = spanishMatches.length;
+    const urScore = urduMatches.length;
+    const enScore = englishMatches.length;
+
+    if (esScore > 0 && esScore >= urScore && esScore >= enScore) return 'spanish';
+    if (urScore > 0 && urScore >= enScore) return 'urdu';
+    if (enScore > 0 && enScore > urScore) return 'english';
+
+    return previousLanguage || 'english';
+  }
+
+  /**
    * Tracks the most recently discussed or viewed product per session for contextual commands ("khud add kardo", "afd akrdoo", etc.)
    */
   public static sessionLastProduct: Map<string, NormalizedProduct> = new Map();
@@ -471,26 +500,44 @@ export class ConversationEngine {
     const { conversationId, message, tenant } = input;
     const trimmedMessage = (message || '').trim();
     const msgLower = trimmedMessage.toLowerCase();
-    const isUrduLangInitial = /(kya|hai|hain|karo|karein|mujhay|mujh|batao|bataen|aap|tum|kaise|kaisay|chahiye|ye|yeh|wo|woh|nhi|nahi|nhin|se|hata|nikaal|nikal|rok|mera|mere)/i.test(msgLower);
+    const prevLang = ConversationEngine.sessionLanguages.get(conversationId);
+    const userLang = (input.userLanguage as any) || ConversationEngine.detectUserLanguage(trimmedMessage, prevLang);
+    ConversationEngine.sessionLanguages.set(conversationId, userLang);
+    const isUrduLang = userLang === 'urdu';
+    const isSpanishLang = userLang === 'spanish';
 
     // 0A. WARM FAREWELL & GOODBYE HANDLER
     const isFarewell = /^\s*(bye+|goodbye|good\s*bye|alvida|allah\s*hafiz|khuda\s*hafiz|tata|see\s*you|take\s*care|cya)[\s!.,?]*$/i.test(msgLower) ||
-                       /\b(bye+|goodbye|allah\s*hafiz|khuda\s*hafiz)\b/i.test(msgLower);
+                       /\b(bye+|goodbye|allah\s*hafiz|khuda\s*hafiz|adios|hasta\s*luego)\b/i.test(msgLower);
     if (isFarewell) {
-      const farewellMsg = isUrduLangInitial
+      const farewellMsg = isUrduLang
         ? "Allah Hafiz! Colbolt par aane ka bohot shukriya. Agar aapko research compounds ya order ke hawale se kabhi bhi madad chahiye ho, hum hamesha dastyab hain. Have a wonderful day! 😊"
+        : isSpanishLang
+        ? "¡Adiós! Muchas gracias por visitar Colbolt. Si alguna vez necesita ayuda con nuestros productos o pedidos, siempre estamos a su disposición. ¡Que tenga un excelente día! 😊"
         : "Goodbye! Thank you for visiting Colbolt. If you ever need assistance with our research compounds or orders, we are always here to help. Have a wonderful day! 😊";
       
       this.recordTurn(conversationId, trimmedMessage, farewellMsg);
+      const quickReplies = isUrduLang
+        ? [
+            { label: 'Tamam Products', actionText: 'Show all products' },
+            { label: 'Shipping Info', actionText: 'What is your shipping policy?' }
+          ]
+        : isSpanishLang
+        ? [
+            { label: 'Ver Productos', actionText: 'Show all products' },
+            { label: 'Info de Envío', actionText: 'What is your shipping policy?' }
+          ]
+        : [
+            { label: 'View All Products', actionText: 'Show all products' },
+            { label: 'Shipping Info', actionText: 'What is your shipping policy?' }
+          ];
+
       return {
         conversationId,
         role: 'assistant',
         message: farewellMsg,
         productCards: undefined,
-        quickReplies: [
-          { label: 'View All Products', actionText: 'Show all products' },
-          { label: 'Shipping Info', actionText: 'What is your shipping policy?' }
-        ]
+        quickReplies
       };
     }
 
@@ -514,12 +561,12 @@ export class ConversationEngine {
     } else if (isCasual || trimmedMessage.length <= 4) {
       chatState.consecutiveChitChat++;
 
-      const isUrdu = /(kya|hai|hain|karo|karein|mujhay|mujh|batao|bataen|aap|tum|kaise|kaisay|kese|chahiye|ye|yeh|wo|woh|nhi|nahi|nhin|haal|hoon|theek|sunao)/i.test(msgLower);
-
       if (chatState.consecutiveChitChat === 2) {
         // 2nd consecutive pleasantry: Polite nudge to focus on business
-        const nudgeMsg = isUrdu
+        const nudgeMsg = isUrduLang
           ? `Main bilkul theek hoon, shukriya! Lekin main sirf Colbolt ke research compounds, pricing, orders aur shipping ke hawale se madad kar sakta hoon. Meherbani farma kar kaam ki baat karein ya apna matlooba product batayein taake main aapki madad kar sakoon.`
+          : isSpanishLang
+          ? `¡Estoy muy bien, gracias! Sin embargo, como asistente de investigación de Colbolt, estoy aquí específicamente para ayudar con compuestos de investigación, precios, pedidos y envíos. Por favor, indíqueme en qué producto o pedido puedo ayudarle.`
           : `I am doing well, thank you! However, as Colbolt's research assistant, I am here specifically to assist with research compounds, pricing, orders, and shipping. Please let me know which product or order inquiry you need help with.`;
 
         this.recordTurn(conversationId, trimmedMessage, nudgeMsg);
@@ -539,8 +586,10 @@ export class ConversationEngine {
         chatState.isWarned = true;
         chatState.isSilenced = true;
 
-        const warnMsg = isUrdu
+        const warnMsg = isUrduLang
           ? `Aap bar bar fazool baatein kar ke time waste kar rahe hain. Meherbani farma kar serious inquiry ya kaam ki baat karein (products, pricing, ya shipping ke baray mein). Jab tak aap kaam ki baat nahi karenge, main mazeed kisi fazool baat ka jawab nahi doonga.`
+          : isSpanishLang
+          ? `Por favor, realice una consulta seria sobre productos de investigación, precios o envíos. Solo responderé una vez que haga una pregunta relevante para la tienda.`
           : `You are repeatedly sending casual pleasantries and wasting time. Please state a serious business inquiry regarding Colbolt research products, pricing, or shipping. I will only respond once you ask a relevant store-related question.`;
 
         this.recordTurn(conversationId, trimmedMessage, warnMsg);
@@ -556,8 +605,10 @@ export class ConversationEngine {
         };
       } else if (chatState.consecutiveChitChat >= 4) {
         // 4th time and beyond: Still trolling after warning -> Silent / firm refusal
-        const silenceMsg = isUrdu
+        const silenceMsg = isUrduLang
           ? `Main sirf Colbolt products aur orders ke hawale se jawab doonga. Jab aap serious inquiry ya product ke baare mein poochhenge, tabhi jawab milega.`
+          : isSpanishLang
+          ? `Solo respondo a consultas relevantes sobre la tienda y pedidos. Indique su consulta sobre productos o pedidos.`
           : `I only answer relevant store and order inquiries. Please state your product or order inquiry.`;
 
         this.recordTurn(conversationId, trimmedMessage, silenceMsg);
@@ -575,7 +626,7 @@ export class ConversationEngine {
     }
 
     // 1. FAST GUARDRAIL CHECK: Check for Prompt Injection / Out-of-Domain topics
-    const guardrail = this.checkGuardrails(trimmedMessage, tenant);
+    const guardrail = this.checkGuardrails(trimmedMessage, tenant, userLang);
     if (guardrail.isBlocked && guardrail.refusalMessage) {
       const companyName = tenant.brand?.companyName || tenant.company?.businessName || 'Colbolt';
       return {
@@ -600,7 +651,6 @@ export class ConversationEngine {
       console.warn(`[ConversationEngine] Failed to fetch products for tenant ${tenant.siteKey}:`, e);
     }
 
-    const isUrduLang = /(kya|hai|hain|karo|karein|mujhay|mujh|batao|bataen|aap|tum|kaise|kaisay|chahiye|ye|yeh|wo|woh|nhi|nahi|nhin|se|hata|nikaal|nikal|rok|mera|mere)/i.test(msgLower);
     const storeUrl = tenant.commerce?.woocommerce?.storeUrl || 'https://colbolt.hawksnfox.com';
     const companyName = tenant.brand?.companyName || tenant.company?.businessName || 'Colbolt';
 
@@ -624,7 +674,7 @@ export class ConversationEngine {
     const openRouterApiKey = process.env.OPENROUTER_API_KEY || (tenant.ai as any)?.openrouterApiKey || tenant.ai?.apiKey;
 
     try {
-      const aiResponse = await this.askAI(input, storeProducts, geminiApiKey, groqApiKey, openRouterApiKey);
+      const aiResponse = await this.askAI(input, storeProducts, geminiApiKey, groqApiKey, openRouterApiKey, userLang);
       if (aiResponse) {
         this.recordTurn(conversationId, trimmedMessage, aiResponse.message);
         return aiResponse;
@@ -895,11 +945,16 @@ export class ConversationEngine {
 
         let cartListing = '';
         if (sessionItems.length > 0) {
-          cartListing = '\n\n🛒 **Aapke Cart Mein Maujood Products**:\n' +
+          const header = isUrduLang
+            ? '\n\n🛒 **Aapke Cart Mein Maujood Products**:\n'
+            : isSpanishLang
+              ? '\n\n🛒 **Productos en tu Carrito**:\n'
+              : '\n\n🛒 **Products in Your Cart**:\n';
+          cartListing = header +
             sessionItems.map(it => `• **${it.title}** (${it.quantity}x) — $${(it.price * it.quantity).toFixed(2)}`).join('\n') +
             `\n💵 **Estimated Subtotal**: $${subtotal.toFixed(2)}\n\n🔗 [View Full Cart](${storeUrl}/cart/)\n💳 [Proceed to Checkout](${storeUrl}/checkout/)`;
         } else {
-          cartListing = isUrduLang ? '\n\nAapka cart ab khali hai.' : '\n\nYour cart is now clear and empty.';
+          cartListing = isUrduLang ? '\n\nAapka cart ab khali hai.' : isSpanishLang ? '\n\nTu carrito ahora está vacío.' : '\n\nYour cart is now clear and empty.';
         }
 
         const msg = confirmations.join('\n\n') + cartListing;
@@ -1753,7 +1808,7 @@ export class ConversationEngine {
     }
 
     // 4. Bulletproof Fallback Knowledge Base (Only if both AI and deterministic rules found no match)
-    const fallback = this.fallbackResponse(input, storeProducts);
+    const fallback = this.fallbackResponse(input, storeProducts, userLang);
     this.recordTurn(conversationId, trimmedMessage, fallback.message);
     return fallback;
   }
@@ -1761,17 +1816,19 @@ export class ConversationEngine {
   /**
    * Deterministic Guardrails: Checks for Jailbreak attempts and Blatant Out-of-Domain queries.
    */
-  private static checkGuardrails(message: string, tenant: TenantConfig): { isBlocked: boolean; refusalMessage?: string } {
+  private static checkGuardrails(
+    message: string, 
+    tenant: TenantConfig,
+    userLang: 'urdu' | 'spanish' | 'english' = 'english'
+  ): { isBlocked: boolean; refusalMessage?: string } {
     const msgLower = message.toLowerCase();
     const companyName = tenant.brand?.companyName || tenant.company?.businessName || 'Colbolt';
 
-    // Detect user language (Roman Urdu vs English)
-    const isUrdu = /(kya|hai|hain|karo|karein|mujhay|mujh|batao|bataen|aap|tum|kaise|kaisay|chahiye|chahaiye|ye|yeh|wo|woh|nhi|nahi|nhin|kitnay|kitna|kaam|baat)/i.test(msgLower);
-
     const refusalUrdu = `Maaf kijiye ga, mujhay is baray mein baat karnay ki ijazat nahi hai. Main sirf ${companyName} ke research compounds, peptides, orders aur shipping ke hawale se aapki madad kar sakta hoon. Kya main ${companyName} catalog mein se koi cheez dikhaoon?`;
+    const refusalSpanish = `Lo siento, pero solo estoy autorizado para ayudar con productos de ${companyName}, compuestos de investigación, pedidos, precios y envíos. ¿Cómo puedo ayudarle hoy con nuestro catálogo?`;
     const refusalEnglish = `I apologize, but I am only authorized to assist with ${companyName} products, research compounds, ordering, pricing, and shipping policies. How can I help you with our store catalog today?`;
 
-    const refusalMessage = isUrdu ? refusalUrdu : refusalEnglish;
+    const refusalMessage = userLang === 'urdu' ? refusalUrdu : userLang === 'spanish' ? refusalSpanish : refusalEnglish;
 
     // 1. Jailbreak / Prompt Injection Patterns
     const jailbreakPatterns = [
@@ -1834,7 +1891,8 @@ export class ConversationEngine {
     storeProducts: NormalizedProduct[],
     geminiApiKey?: string,
     groqApiKey?: string,
-    openRouterApiKey?: string
+    openRouterApiKey?: string,
+    userLang: 'urdu' | 'spanish' | 'english' = 'english'
   ): Promise<ChatResponse | null> {
     const { conversationId, message, tenant } = input;
 
@@ -1858,9 +1916,29 @@ export class ConversationEngine {
         `\nCurrent Cart Subtotal: $${liveSessionCart.reduce((acc, it) => acc + (it.price * it.quantity), 0).toFixed(2)}`
       : 'Cart is currently empty.';
 
+    const langUpper = userLang.toUpperCase();
     const systemPrompt = `
 You are ${assistantName}, the dedicated customer service and sales assistant for ${companyName} (${storeUrl}).
 Your persona is warm, highly intelligent, respectful, empathetic, and scientifically knowledgeable—like a senior customer care specialist at a biotechnology research firm.
+
+================================================================================
+CRITICAL MANDATORY INSTRUCTION: STRICT LANGUAGE MATCHING (ZERO TOLERANCE)
+================================================================================
+THE SHOPPER IS COMMUNICATING IN: ${langUpper}
+YOU MUST WRITE YOUR ENTIRE RESPONSE 100% IN ${langUpper}!
+${userLang === 'english' ? `
+- The customer is speaking ENGLISH.
+- You MUST reply 100% in pure, polite, professional English!
+- Under NO circumstance should you use Roman Urdu or Hindi words (NEVER say "Walaikum Assalam", "aapka", "shukriya", "dastyab", "hai", "kijiye", "bataiye", "hamare paas", "hum", "jee", "haan", etc.)!
+- Start your greetings in pure English (e.g. "Hello! Welcome to ${companyName}...").
+` : userLang === 'urdu' ? `
+- The customer is speaking ROMAN URDU / URDU.
+- You MUST reply 100% in natural, respectful, friendly Roman Urdu (e.g., "Assalam-o-Alaikum! ${companyName} par hum certified laboratory research compounds provide karte hain...").
+` : `
+- The customer is speaking SPANISH.
+- You MUST reply 100% in natural, respectful, friendly Spanish (e.g., "¡Hola! Bienvenido a ${companyName}...").
+`}
+================================================================================
 
 ABOUT ${companyName.toUpperCase()}:
 ${aboutUs}
@@ -1986,14 +2064,14 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
     // 0. PRIMARY AI: GOOGLE GEMINI (1,500 Requests/Day, 1,000,000 Tokens/Min, 100% Free Forever)
     if (geminiApiKey && !this.geminiAuthFailed) {
       const geminiModels = [
-        'gemini-3.5-flash-lite',
-        'gemini-3.1-flash-lite',
-        'gemini-flash-lite-latest'
+        'gemini-3-flash-preview',
+        'gemini-flash-latest',
+        'gemini-3.5-flash-lite'
       ];
       for (const gModel of geminiModels) {
         if (replyText) break;
         const ctrl = new AbortController();
-        const timeoutId = setTimeout(() => ctrl.abort(), 15000);
+        const timeoutId = setTimeout(() => ctrl.abort(), 7000);
         try {
           const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${gModel}:generateContent?key=${geminiApiKey}`;
           const res = await fetch(geminiUrl, {
@@ -2291,11 +2369,23 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
       }
     }
 
-    const quickReplies: QuickReplyOption[] = [
-      { label: 'View All Products', actionText: 'Show all products' },
-      { label: 'Shipping Info', actionText: 'What is your shipping policy?' },
-      { label: `About ${companyName}`, actionText: `What does ${companyName} do?` }
-    ];
+    const quickReplies: QuickReplyOption[] = userLang === 'urdu'
+      ? [
+          { label: 'Tamam Products Dekhein', actionText: 'Show all products' },
+          { label: 'Shipping Maloomat', actionText: 'What is your shipping policy?' },
+          { label: `${companyName} ke Baare Mein`, actionText: `What does ${companyName} do?` }
+        ]
+      : userLang === 'spanish'
+      ? [
+          { label: 'Ver Todos los Productos', actionText: 'Show all products' },
+          { label: 'Información de Envío', actionText: 'What is your shipping policy?' },
+          { label: `Sobre ${companyName}`, actionText: `What does ${companyName} do?` }
+        ]
+      : [
+          { label: 'View All Products', actionText: 'Show all products' },
+          { label: 'Shipping Info', actionText: 'What is your shipping policy?' },
+          { label: `About ${companyName}`, actionText: `What does ${companyName} do?` }
+        ];
 
     return {
       conversationId,
@@ -2453,88 +2543,110 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
 
   private static fallbackResponse(
     input: ConversationTurnInput,
-    storeProducts: NormalizedProduct[]
+    storeProducts: NormalizedProduct[],
+    userLang: 'urdu' | 'spanish' | 'english' = 'english'
   ): ChatResponse {
     const { conversationId, message, tenant } = input;
     const msgLower = message.toLowerCase().trim();
     const companyName = tenant.brand?.companyName || tenant.company?.businessName || 'Colbolt';
 
-    const isUrdu = /(kya|hai|hain|karo|karein|mujhay|mujh|batao|bataen|aap|tum|kaise|kaisay|chahiye|chahaiye|ye|yeh|wo|woh|nhi|nahi|nhin|kitnay|kitna|kaam|baat|dikhao|dikhaen|paas)/i.test(msgLower);
+    const isUrdu = userLang === 'urdu';
+    const isSpanish = userLang === 'spanish';
+
+    const defaultQuickReplies: QuickReplyOption[] = isUrdu
+      ? [
+          { label: 'Tamam Products Dekhein', actionText: 'Show all products' },
+          { label: 'Shipping Maloomat', actionText: 'What is your shipping policy?' },
+          { label: `${companyName} ke Baare Mein`, actionText: `What does ${companyName} do?` }
+        ]
+      : isSpanish
+      ? [
+          { label: 'Ver Todos los Productos', actionText: 'Show all products' },
+          { label: 'Información de Envío', actionText: 'What is your shipping policy?' },
+          { label: `Sobre ${companyName}`, actionText: `What does ${companyName} do?` }
+        ]
+      : [
+          { label: 'View All Products', actionText: 'Show all products' },
+          { label: 'Shipping Info', actionText: 'What is your shipping policy?' },
+          { label: `About ${companyName}`, actionText: `What does ${companyName} do?` }
+        ];
 
     // 1. Budget specified (e.g. "my budget is 5 dollars", "in 15 dollar", "$15")
     const budgetMatch = msgLower.match(/(\d+)\s*(?:dollar|\$|usd)/i);
     if (budgetMatch) {
       const budget = parseInt(budgetMatch[1], 10);
       const affordable = storeProducts.filter(p => (p.price.sale || p.price.regular) <= budget);
+      const messageText = affordable.length > 0
+        ? (isUrdu 
+            ? `Aapke budget **$${budget}** ke hisaab se yeh products ${companyName} par available hain:`
+            : isSpanish
+            ? `De acuerdo con su presupuesto de **$${budget}**, aquí tiene los productos disponibles en ${companyName}:`
+            : `Based on your budget of **$${budget}**, here are matching products from ${companyName}:`)
+        : (isUrdu
+            ? `Hamare paas $${budget} se kam koi item nahi hai. Sab se kam qeemat wala product **Bacteriostatic Water 10mg** hai ($15.00).`
+            : isSpanish
+            ? `Actualmente no tenemos artículos por menos de $${budget}. Nuestro producto más económico es **Bacteriostatic Water 10mg** a **$15.00**.`
+            : `We do not currently have items under $${budget}. Our lowest priced item is **Bacteriostatic Water 10mg** at **$15.00**.`);
       return {
         conversationId,
         role: 'assistant',
-        message: affordable.length > 0
-          ? (isUrdu 
-              ? `Aapke budget **$${budget}** ke hisaab se yeh products Colbolt par available hain:`
-              : `Based on your budget of **$${budget}**, here are matching products from ${companyName}:`)
-          : (isUrdu
-              ? `Hamare paas $${budget} se kam koi item nahi hai. Sab se kam qeemat wala product **Bacteriostatic Water 10mg** hai ($15.00).`
-              : `We do not currently have items under $${budget}. Our lowest priced item is **Bacteriostatic Water 10mg** at **$15.00**.`),
+        message: messageText,
         productCards: affordable.length > 0 ? affordable : storeProducts.filter(p => p.price.regular <= 15),
-        quickReplies: [{ label: 'View All Products', actionText: 'Show all products' }]
+        quickReplies: defaultQuickReplies
       };
     }
 
     // 2. Shipping & Delivery Policy Inquiry
-    const isShippingInquiry = /\b(shipping|delivery|dispatch|track|tracking|ship|courier|transport|rawana|bhejna|kab tak|how long|arrive|days)\b/i.test(msgLower);
+    const isShippingInquiry = /\b(shipping|delivery|dispatch|track|tracking|ship|courier|transport|rawana|bhejna|kab tak|how long|arrive|days|envio|envios|entrega)\b/i.test(msgLower);
     if (isShippingInquiry) {
       const shippingText = tenant.company?.shippingPolicy || 'Orders are processed securely and dispatched within 24-48 business hours with tracking provided.';
       const deliveryText = tenant.company?.deliveryEstimate || 'Standard US shipping takes 3-5 business days; expedited options available at checkout.';
       const msg = isUrdu
         ? `${companyName} ki shipping policy: Hamaray tamam orders 24-48 business hours ke andar securely dispatch hotay hain aur tracking number provide kiya jata hai. Standard delivery mein taqreeban 3-5 business days lagtay hain. Checkout ke waqt expedited options bhi dastyab hain.`
+        : isSpanish
+        ? `Política de envío de ${companyName}: Los pedidos se procesan y despachan de forma segura en un plazo de 24-48 horas hábiles con número de seguimiento. El envío estándar demora de 3 a 5 días hábiles.`
         : `${companyName} Shipping Policy: ${shippingText} ${deliveryText}`;
       return {
         conversationId,
         role: 'assistant',
         message: msg,
         productCards: undefined,
-        quickReplies: [
-          { label: 'Show All Products', actionText: 'Show all products' },
-          { label: `About ${companyName}`, actionText: `What does ${companyName} do?` }
-        ]
+        quickReplies: defaultQuickReplies
       };
     }
 
     // 3. About Company / Store / Ecommerce Website Inquiry
-    const isCompanyInquiry = /\b(what does colbolt do|about colbolt|about you|who are you|about your|company|ecommerce website|website|store|about us|kya kaam|kya kartay|kya karte|batao website|platform|what is colbolt|tell me about)\b/i.test(msgLower);
+    const isCompanyInquiry = /\b(what does colbolt do|about colbolt|about you|who are you|about your|company|ecommerce website|website|store|about us|kya kaam|kya kartay|kya karte|batao website|platform|what is colbolt|tell me about|quienes son|sobre ustedes)\b/i.test(msgLower);
     if (isCompanyInquiry) {
       const aboutText = tenant.company?.aboutUs || `${companyName} provides high-quality laboratory research solutions, compounds, and peptides with verified purity and discreet delivery.`;
       const msg = isUrdu
         ? `${companyName} aik premium online research supply platform hai. Hum certified laboratory research compounds, peptides (jesay Tirz, Retatrutide, Semaglutide) aur sterile diluents (Bacteriostatic Water) verified purity aur discreet packaging ke sath provide karte hain. Aap chat ke zariye direct pricing pooch saktay hain ya items ko Cart mein add kar saktay hain.`
+        : isSpanish
+        ? `${companyName} es una tienda en línea de soluciones de investigación biotecnológica: ${aboutText} Todos los productos se suministran estrictamente para investigación de laboratorio calificada.`
         : `${companyName} is an online biotechnology research supply store: ${aboutText} All products (including Tirz, Retatrutide, Semaglutide, and Bacteriostatic Water) are supplied strictly for qualified in-vitro and laboratory research.`;
       return {
         conversationId,
         role: 'assistant',
         message: msg,
         productCards: undefined,
-        quickReplies: [
-          { label: 'Show All Products', actionText: 'Show all products' },
-          { label: 'Shipping Info', actionText: 'What is your shipping policy?' }
-        ]
+        quickReplies: defaultQuickReplies
       };
     }
 
-    // 4. Products / Catalog Inquiry (e.g. "can you tell me which product you have", "what products", "show all products", "catalog", "list")
-    const isCatalogInquiry = /\b(product|products|which product|what product|what you have|what do you have|all product|catalog|list|available items|dikhao|kya kya|kai kai|paas kya|inventory|sab dikhao|items|stock)\b/i.test(msgLower);
+    // 4. Products / Catalog Inquiry (e.g. "can you tell me which product you have", "what products", "show all products", "catalog", "list", "que productos tienen")
+    const isCatalogInquiry = /\b(product|products|which product|what product|what you have|what do you have|all product|catalog|list|available items|dikhao|kya kya|kai kai|paas kya|inventory|sab dikhao|items|stock|productos|tienen|disponibles)\b/i.test(msgLower);
     if (isCatalogInquiry) {
       const msg = isUrdu
         ? `Bilkul! ${companyName} ke paas verified laboratory research compounds aur diluents available hain. Neeche hamare live catalog ke items hain jahan se aap directly details dekh saktay hain ya Add to Cart kar saktay hain:`
+        : isSpanish
+        ? `¡Por supuesto! Aquí están los compuestos de investigación y diluyentes verificados disponibles en ${companyName}. Puede ver los detalles o añadir artículos directamente a su carrito:`
         : `Certainly! Here are the verified laboratory research compounds and diluents available at ${companyName}. You can view details or add items directly to your cart:`;
       return {
         conversationId,
         role: 'assistant',
         message: msg,
         productCards: storeProducts,
-        quickReplies: [
-          { label: 'Shipping Info', actionText: 'What is your shipping policy?' },
-          { label: `About ${companyName}`, actionText: `What does ${companyName} do?` }
-        ]
+        quickReplies: defaultQuickReplies
       };
     }
 
@@ -2544,60 +2656,58 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
       const p = relevantCards[0];
       const msg = isUrdu
         ? `Aapka matlooba item **${p.title}** (${p.price.formatted}) hamare paas stock mein available hai ✅. Research peptides ke sath sterile dilution ke liye **Bacteriostatic Water 10mg** ($15.00) diluent zaroori hota hai jo hamare paas available hai. Kya aap isay cart mein add karna chahtay hain?`
+        : isSpanish
+        ? `**${p.title}** (${p.price.formatted}) está disponible en stock ✅. Para la investigación de laboratorio, **Bacteriostatic Water 10mg** ($15.00) también está disponible como diluyente estéril. ¿Le gustaría añadirlo a su carrito?`
         : `**${p.title}** (${p.price.formatted}) is available in stock ✅. For laboratory research, **Bacteriostatic Water 10mg** ($15.00) is also available as the required diluent. Would you like to add this to your cart?`;
       return {
         conversationId,
         role: 'assistant',
         message: msg,
         productCards: relevantCards,
-        quickReplies: [
-          { label: 'View All Products', actionText: 'Show all products' },
-          { label: 'Shipping Info', actionText: 'What is your shipping policy?' }
-        ]
+        quickReplies: defaultQuickReplies
       };
     }
 
     // 6. Payment, Ordering & Checkout Inquiry
-    const isPaymentInquiry = /\b(pay|payment|card|bank|checkout|buy|order|cod|bacs|purchase|khareedna|kaise khareedein)\b/i.test(msgLower);
+    const isPaymentInquiry = /\b(pay|payment|card|bank|checkout|buy|order|cod|bacs|purchase|khareedna|kaise khareedein|pagar|pago|comprar)\b/i.test(msgLower);
     if (isPaymentInquiry) {
       const msg = isUrdu
         ? `Colbolt par order karna bohat aasan hai! Aap kisi bhi product card ke upar **"Add to Cart"** button daba kar usay direct cart mein add kar saktay hain. Iske baad aap https://colbolt.hawksnfox.com/checkout/ par ja kar direct bank transfer ya available payment options ke sath order complete kar saktay hain.`
+        : isSpanish
+        ? `¡Realizar pedidos en ${companyName} es rápido y seguro! Puede hacer clic en el botón "Add to Cart" en cualquier tarjeta de producto. Una vez añadido, proceda al pago en ${tenant.commerce?.woocommerce?.storeUrl || 'https://colbolt.hawksnfox.com'}/checkout/ para completar su pedido.`
         : `Ordering at ${companyName} is fast and seamless! You can click the "Add to Cart" button on any product card in this chat. Once added, proceed to checkout at ${tenant.commerce?.woocommerce?.storeUrl || 'https://colbolt.hawksnfox.com'}/checkout/ to complete your order securely.`;
       return {
         conversationId,
         role: 'assistant',
         message: msg,
         productCards: undefined,
-        quickReplies: [
-          { label: 'Show All Products', actionText: 'Show all products' },
-          { label: 'Shipping Info', actionText: 'What is your shipping policy?' }
-        ]
+        quickReplies: defaultQuickReplies
       };
     }
 
     // 7. Pure greeting / Welcome (ONLY when message is strictly a greeting)
-    const isPureGreeting = /^(hello|hi|hey|heyy|salam|asalam|assalam|aoa|kya haal|how are you|good morning|good afternoon|good evening)[\s!.,?]*$/i.test(msgLower);
+    const isPureGreeting = /^(hello|hi|hey|heyy|salam|asalam|assalam|aoa|kya haal|how are you|good morning|good afternoon|good evening|hola|buenos dias|buenas tardes)[\s!.,?]*$/i.test(msgLower);
     if (isPureGreeting) {
       const greetingMsg = isUrdu
         ? `Assalam-o-Alaikum! ${companyName} customer support mein khush-aamdeed. Main laboratory research compounds, diluents, pricing aur orders ke hawale se aapki madad kar sakta hoon. Aaj main aapki kya madad karoon?`
+        : isSpanish
+        ? `¡Hola! Bienvenido a ${companyName}. Puedo ayudarle con compuestos de investigación de laboratorio, precios, disponibilidad y pedidos. ¿Cómo puedo ayudarle hoy?`
         : `Hello! Welcome to ${companyName}. I can assist you with laboratory research compounds, pricing, availability, and placing orders. How can I help you today?`;
 
       return {
         conversationId,
         role: 'assistant',
         message: greetingMsg,
-        productCards: undefined, // Pure greetings NEVER have product cards!
-        quickReplies: [
-          { label: 'Show All Products', actionText: 'Show all products' },
-          { label: 'Shipping Info', actionText: 'What is your shipping policy?' },
-          { label: `About ${companyName}`, actionText: `What does ${companyName} do?` }
-        ]
+        productCards: undefined,
+        quickReplies: defaultQuickReplies
       };
     }
 
     // 8. General domain-aligned response for unrecognized messages
     const generalMsg = isUrdu
       ? `Main ${companyName} customer support assistant hoon. Main hamaray research compounds (jesay Tirz, Retatrutide, Semaglutide, Bacteriostatic Water), pricing, availability, shipping policies, ya cart mein add karnay ke hawale se aapki madad kar sakta hoon. Aap kis baray mein janna chahtay hain?`
+      : isSpanish
+      ? `Soy el asistente de atención al cliente de ${companyName}. Puedo ayudarle con la disponibilidad de productos, precios exactos, detalles de envío o agregando artículos directamente a su carrito. ¿En qué puedo ayudarle hoy?`
       : `I am your ${companyName} customer care assistant. I can assist you with product availability, exact pricing, shipping details, or adding items directly to your cart. How can I assist with your research inquiry today?`;
 
     return {
@@ -2605,11 +2715,7 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
       role: 'assistant',
       message: generalMsg,
       productCards: undefined,
-      quickReplies: [
-        { label: 'Show All Products', actionText: 'Show all products' },
-        { label: 'Shipping Info', actionText: 'What is your shipping policy?' },
-        { label: `About ${companyName}`, actionText: `What does ${companyName} do?` }
-      ]
+      quickReplies: defaultQuickReplies
     };
   }
 }
