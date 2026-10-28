@@ -2,6 +2,8 @@ node_modules/
 dist-plugin/*.zip
 dist-cpanel/*.zip
 .env.local
+.env
+packages/*/.env
 logs/*.bak
 .DS_Store
 Thumbs.db
