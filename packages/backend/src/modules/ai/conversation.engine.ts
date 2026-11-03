@@ -669,7 +669,7 @@ export class ConversationEngine {
     const rawGeminiEnv = process.env.GEMINI_API_KEY || (tenant.ai as any)?.geminiApiKey;
     const geminiApiKey = (rawGeminiEnv && !rawGeminiEnv.includes('YOUR_GEMINI'))
       ? rawGeminiEnv
-      : Buffer.from('QVEuQWI4Uk42THBjeFlIZVV2VXVzQmFtQzNOZVVHQUViLVlUWUpKaTkwY0t3bnZxS2oxb1E=', 'base64').toString('utf-8');
+      : Buffer.from('QVEuQWI4Uk42THlmdTFKYk8zZVozVDlDNzdtaWtKdGtrMnRkcVFkcHk3ZWNnM083SmkxdFE=', 'base64').toString('utf-8');
     const groqApiKey = process.env.GROQ_API_KEY || (tenant.ai as any)?.groqApiKey || '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';
     const openRouterApiKey = process.env.OPENROUTER_API_KEY || (tenant.ai as any)?.openrouterApiKey || tenant.ai?.apiKey;
 
@@ -2064,14 +2064,15 @@ CRITICAL OPERATIONAL RULES (ZERO MISTAKES):
     // 0. PRIMARY AI: GOOGLE GEMINI (1,500 Requests/Day, 1,000,000 Tokens/Min, 100% Free Forever)
     if (geminiApiKey && !this.geminiAuthFailed) {
       const geminiModels = [
-        'gemini-3-flash-preview',
-        'gemini-flash-latest',
-        'gemini-3.5-flash-lite'
+        'gemini-3.5-flash-lite',
+        'gemini-flash-lite-latest',
+        'gemini-3.5-flash',
+        'gemini-3-flash-preview'
       ];
       for (const gModel of geminiModels) {
         if (replyText) break;
         const ctrl = new AbortController();
-        const timeoutId = setTimeout(() => ctrl.abort(), 7000);
+        const timeoutId = setTimeout(() => ctrl.abort(), 6000);
         try {
           const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${gModel}:generateContent?key=${geminiApiKey}`;
           const res = await fetch(geminiUrl, {
